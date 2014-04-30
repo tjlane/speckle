@@ -10,7 +10,7 @@ samples = np.random.negative_binomial(10, .9, size=1e5)
 
 x = np.arange(samples.min(), samples.max())
 beta_hat, err = core.fit_negative_binomial(samples, method='expansion')
-curve = core.negative_binomial_pdf(x, samples.mean(), beta_hat)
+curve = core.negative_binomial_pmf(x, samples.mean(), beta_hat)
 print x, beta_hat, curve
 
 plt.figure()

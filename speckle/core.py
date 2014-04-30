@@ -39,7 +39,7 @@ def init_psana(run, expt='', config_file=None):
     return ds, epics
 
 
-def autocorrelate_image(cspad_image, window=10):
+def autocorrelate_image(cspad_image):
     """
     Autocorrelate an image to determine the distribution of speckle sizes.
     
@@ -47,11 +47,7 @@ def autocorrelate_image(cspad_image, window=10):
     ----------
     cspad_image : np.ndarray
         The image, (32, 185, 388) format
-        
-    window : int
-        The window size to look at, in pixels. Should completely enclose the
-        speckle of interest.
-        
+
     Returns
     -------
     acf : np.ndarray
@@ -67,7 +63,7 @@ def autocorrelate_image(cspad_image, window=10):
         raise ValueError('`cspad_image` incorrect shape. Expected (32, 185, '
                          '388), got %s' % str(cspad_image.shape))
     
-    acf = np.zeros((185, 388))
+    acf = np.zeros((369,775))
     
     for two_by_one in cspad_image:
         x = two_by_one - two_by_one.mean()
@@ -77,6 +73,42 @@ def autocorrelate_image(cspad_image, window=10):
         
     return acf
     
+    
+def speckle_profile(autocorrelation_image, resolution=1.0):
+    """
+    Compute the speckle profile from an autocorrelation.
+    
+    Parameters
+    ----------
+    autocorrelation_image : np.ndarray
+        A (`window`, `window`) shape array containing the autocorrelation
+        of the image. Not normalized.
+        
+    resolution : float
+        The resolution of the profile, in pixel units.
+        
+    Returns
+    -------
+    profile : np.ndarray
+        The radial profile of the speckle autocorrelation.
+    """
+    
+    if not autocorrelation_image.shape == (369, 775):
+        raise ValueError()
+    
+    c = np.array([184, 387])[:,None,None]
+    r = np.sqrt( np.sum( np.square(np.mgrid[:369,:775] - c), axis=0 ) )
+    
+    bins = int(r.max() / resolution)
+    
+    values, edges = np.histogram(r.flatten(), bins=bins, 
+                                 weights=autocorrelation_image.flatten() / np.square(r.flatten() + 1e-100))
+    profile = np.zeros(( len(values), 2 ))
+    profile[:,0] = edges[:-1] + 0.5 * (edges[1] - edges[0])
+    profile[:,1] = values
+    
+    return profile
+
     
 def ADU_to_photons(cspad_image, cuts):
     """
@@ -107,6 +139,10 @@ def fit_negative_binomial(samples, method='ml'):
         
     sigma_contrast : float
         The first moment of the parameter estimation function.
+        
+    References
+    ----------
+    ..[1] PRL 109, 185502 (2012)
     """
     
     k = samples.flatten()
@@ -160,18 +196,32 @@ def fit_negative_binomial(samples, method='ml'):
     return contrast, sigma_contrast
     
     
-def negative_binomial_pdf(k_range, k_bar, contrast):
+def negative_binomial_pmf(k_range, k_bar, contrast):
     """
-    
+    Evaluate the negative binomial probablility mass function.
     
     Parameters
     ----------
-    
+    k_range : ndarray, int
+        The integer values in the domain of the PMF to evaluate.
+        
+    k_bar : float
+        The mean count density. Greater than zero.
+        
+    contrast : float
+        The contrast parameter, in [0.0, 1.0).
+        
+    Returns
+    -------
+    pmf : np.ndarray, float
+        The normalized pmf for each point in `k_range`.
     """
+    
     M = 1.0 / contrast
     norm = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range+1))
     f1 = np.power(1.0 + M/k_bar, -k_range)
     f2 = np.power(1.0 + k_bar/M, -M)
+    
     return norm * f1 * f2
 
     
