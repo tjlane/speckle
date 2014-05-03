@@ -120,7 +120,7 @@ def ADU_to_photons(cspad_image, cuts=None):
     return np.digitize(cspad_image.flatten(), cuts).reshape(cspad_image.shape)
 
     
-def fit_negative_binomial(samples, method='ml', limit=1e-16):
+def fit_negative_binomial(samples, method='ml', limit=1e-4):
     """
     Estimate the parameters of a negative binomial distribution, using either
     a maximum-likelihood fit or an analytic estimate appropriate in the low-
@@ -133,6 +133,11 @@ def fit_negative_binomial(samples, method='ml', limit=1e-16):
     
     method : str, {"ml", "expansion", "lsq"}
         Which method to use to estimate the contrast.
+
+    limit : float
+        If method == 'ml', then this sets the lower limit for which contrast
+        can be evaluated. Note that the solution can be sensitive to this
+        value.
         
     Returns
     -------
