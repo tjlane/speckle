@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 sys.path.append('../speckle')
 import core
 
-samples = np.random.negative_binomial(10, .9, size=1e5)
+samples = np.random.negative_binomial(10, .99, size=1e5)
 
 x = np.arange(samples.min(), samples.max())
-beta_hat, err = core.fit_negative_binomial(samples, method='expansion')
+beta_hat, err = core.fit_negative_binomial(samples, method='lsq')
 curve = core.negative_binomial_pmf(x, samples.mean(), beta_hat)
 print x, beta_hat, curve
 

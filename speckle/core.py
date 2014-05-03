@@ -59,8 +59,8 @@ def autocorrelate_image(cspad_image):
     Tests indicate current implementation will run at ~2.4s/image = 0.4 Hz.
     """
     
-    if not cspad_image.shape == (32, 185, 388):
-        raise ValueError('`cspad_image` incorrect shape. Expected (32, 185, '
+    if not cspad_image.shape[1:] == (185, 388):
+        raise ValueError('`cspad_image` incorrect shape. Expected (X, 185, '
                          '388), got %s' % str(cspad_image.shape))
     
     acf = np.zeros((369,775))
@@ -110,15 +110,17 @@ def speckle_profile(autocorrelation_image, resolution=1.0):
     return profile
 
     
-def ADU_to_photons(cspad_image, cuts):
+def ADU_to_photons(cspad_image, cuts=None):
     """
     Given `cuts` that demarkate photon bins in ADU units, transform 
     `cspad_image` from ADU units to photon counts.
     """
+    if cuts == None:
+         cuts = np.arange(21.0, 1000.0, 37.5)
     return np.digitize(cspad_image.flatten(), cuts).reshape(cspad_image.shape)
 
     
-def fit_negative_binomial(samples, method='ml'):
+def fit_negative_binomial(samples, method='ml', limit=1e-16):
     """
     Estimate the parameters of a negative binomial distribution, using either
     a maximum-likelihood fit or an analytic estimate appropriate in the low-
@@ -129,7 +131,7 @@ def fit_negative_binomial(samples, method='ml'):
     samples : np.ndarray, int
         An array of the photon counts for each pixel.
     
-    method : str, {"ml", "expansion"}
+    method : str, {"ml", "expansion", "lsq"}
         Which method to use to estimate the contrast.
         
     Returns
@@ -158,15 +160,18 @@ def fit_negative_binomial(samples, method='ml'):
             return t1 + t2
        
         try: 
-            contrast = optimize.brentq(logL_prime, 1e-6, 1.0)
+            contrast = optimize.brentq(logL_prime, limit, 1.0)
         except ValueError as e:
             print e
-            raise ValueError('log-likelihood function has no maximum given'
-                             ' the empirical example provided. Please samp'
-                             'le additional points and try again.')
+            #raise ValueError('log-likelihood function has no maximum given'
+            #                 ' the empirical example provided. Please samp'
+            #                 'le additional points and try again.')
+            contrast = limit
+            sigma_contrast = 1.0
+            return contrast, sigma_contrast
         
         def logL_dbl_prime(contrast):
-            M = 1.0 / contrast
+            M = 1.0 / (contrast + 1e-100)
             t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
             t2 = - N * digamma(M)
             t3 = np.sum( digamma(k + M) )
@@ -176,13 +181,26 @@ def fit_negative_binomial(samples, method='ml'):
         if sigma_contrast < 0.0:
             raise RuntimeError('Maximum likelihood optimization found a local '
                                'minimum instead of maximum! sigma = %s' % sigma_contrast) 
-                               
+    
+    elif method == 'lsq': # use least-squares fit
+
+        empirical_pmf = np.bincount(samples)
+        k_range = np.arange(len(empirical_pmf))
+
+        err = lambda contrast : negative_binomial_pmf(k_range, k_bar, contrast) - empirical_pmf
         
+        c0 = 0.5
+        contrast, success = optimize.leastsq(err, c0)
+        if success:
+            contrast = contrast[0]
+            sigma_contrast = success
+        else:
+            raise RuntimeError('least-squares fit did not converge.')
+    
     elif method == 'expansion': # use low-order expansion
         # directly from the SI of the paper in the doc string
         p1 = np.sum( k == 1 ) / N
         p2 = np.sum( k == 2 ) / N
-        print p1, p2
         contrast = (2.0 * p2 * (1.0 - p1) / np.square(p1)) - 1.0
         
         # this is not quite what they recommend, but it's close...
@@ -191,7 +209,7 @@ def fit_negative_binomial(samples, method='ml'):
         
         
     else:
-        raise ValueError('`method` must be one of {"ml", "expansion"}')
+        raise ValueError('`method` must be one of {"ml", "ls", "expansion"}')
     
     return contrast, sigma_contrast
     
@@ -199,6 +217,36 @@ def fit_negative_binomial(samples, method='ml'):
 def negative_binomial_pmf(k_range, k_bar, contrast):
     """
     Evaluate the negative binomial probablility mass function.
+    
+    Parameters
+    ----------
+    k_range : ndarray, int
+        The integer values in the domain of the PMF to evaluate.
+        
+    k_bar : float
+        The mean count density. Greater than zero.
+        
+    contrast : float
+        The contrast parameter, in [0.0, 1.0).
+        
+    Returns
+    -------
+    pmf : np.ndarray, float
+        The normalized pmf for each point in `k_range`.
+    """
+
+    M = 1.0 / contrast
+    norm = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range+1))
+    f1 = np.power(1.0 + M/k_bar, -k_range)
+    f2 = np.power(1.0 + k_bar/M, -M)
+    
+    return norm * f1 * f2
+
+
+
+def negative_binomial_ef(k_range, k_bar, contrast):
+    """
+    Evaluate the negative binomial probablility error function.
     
     Parameters
     ----------
