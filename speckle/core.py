@@ -101,11 +101,13 @@ def speckle_profile(autocorrelation_image, resolution=1.0):
     
     bins = int(r.max() / resolution)
     
-    values, edges = np.histogram(r.flatten(), bins=bins, 
-                                 weights=autocorrelation_image.flatten() / np.square(r.flatten() + 1e-100))
+    #values, edges = np.histogram(r.flatten(), bins=bins, 
+    #                             weights=autocorrelation_image.flatten() / np.square(r.flatten() + 1e-100))
+    values, edges = np.histogram(r.flatten(), bins=bins, weights=autocorrelation_image.flatten())
+    rvalues, redges = np.histogram(r.flatten(), bins=bins)
     profile = np.zeros(( len(values), 2 ))
     profile[:,0] = edges[:-1] + 0.5 * (edges[1] - edges[0])
-    profile[:,1] = values
+    profile[:,1] = values/rvalues
     
     return profile
 
@@ -116,7 +118,7 @@ def ADU_to_photons(cspad_image, cuts=None):
     `cspad_image` from ADU units to photon counts.
     """
     if cuts == None:
-         cuts = np.arange(21.0, 1000.0, 37.5)
+         cuts = np.arange(21.0, 10000.0, 37.5)
     return np.digitize(cspad_image.flatten(), cuts).reshape(cspad_image.shape)
 
     
@@ -151,17 +153,40 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
     ----------
     ..[1] PRL 109, 185502 (2012)
     """
+    h = np.bincount(samples)
+    return fit_negative_binomial_from_hist(h, method=method, limit=limit)
+
+
+def fit_negative_binomial_from_hist(empirical_pmf, method='ml', limit=1e-4):
+    """
+    Just like fit_negative_binomial, but uses the argument `empirical_pmf`,
+    simply the empirical distribution of counts. I.e. empirical_pmf[n] should yield
+    an integer counting how many samples there were with `n` counts.
+
+    Parameters
+    ----------
     
-    k = samples.flatten()
-    N = float( len(k) )
-    k_bar = np.mean(samples)
+    Returns
+    -------
+
+    See Also
+    --------
+    fit_negative_binomial : function
+    """
+    
+    #k = samples.flatten()
+    N = float( empirical_pmf.sum() )
+    n = np.arange( len(empirical_pmf) )
+    k_bar = np.sum(n * empirical_pmf) / N #np.mean(samples)
+    pmf = empirical_pmf # just a shorthand
+    #print "k_bar", k_bar
     
     if method == 'ml': # use maximium likelihood estimation
         
         def logL_prime(contrast):
             M = 1.0 / contrast
             t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
-            t2 = np.sum( (k_bar - k)/(k_bar + M) + digamma(k + M) )
+            t2 = np.sum( pmf * ((k_bar - n) / (k_bar + M) + digamma(n + M)) )
             return t1 + t2
        
         try: 
@@ -177,9 +202,10 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
         
         def logL_dbl_prime(contrast):
             M = 1.0 / (contrast + 1e-100)
-            t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
+            n = np.arange( len(empirical_pmf) )
+            t1 = np.sum( pmf * ((np.square(k_bar) - n*M) / (M * np.square(k_bar + M))) )
             t2 = - N * digamma(M)
-            t3 = np.sum( digamma(k + M) )
+            t3 = np.sum( pmf * digamma(n + M) )
             return t1 + t2 + t3
             
         sigma_contrast = logL_dbl_prime(contrast)
@@ -189,7 +215,6 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
     
     elif method == 'lsq': # use least-squares fit
 
-        empirical_pmf = np.bincount(samples)
         k_range = np.arange(len(empirical_pmf))
 
         err = lambda contrast : negative_binomial_pmf(k_range, k_bar, contrast) - empirical_pmf
@@ -204,8 +229,8 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
     
     elif method == 'expansion': # use low-order expansion
         # directly from the SI of the paper in the doc string
-        p1 = np.sum( k == 1 ) / N
-        p2 = np.sum( k == 2 ) / N
+        p1 = empirical_pmf[1]
+        p2 = empirical_pmf[2]
         contrast = (2.0 * p2 * (1.0 - p1) / np.square(p1)) - 1.0
         
         # this is not quite what they recommend, but it's close...

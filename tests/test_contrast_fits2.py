@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 sys.path.append('../speckle')
 import core
 
-k_bar       = 0.01
+k_bar       = 1.0
 contrast    = 0.5
 sample_size = 2*185*388
 
@@ -43,18 +43,17 @@ def get_randos(k_bar, contrast, samples):
 
 contrast_error = []
 many_photon_events = []
-#contrasts = np.linspace(0.1, 0.9, 101)
+contrasts = np.linspace(0.1, 0.9, 101)
 #k_bars = np.power(10, np.linspace(-5, 1, 101))
-sample_sizes = np.array([np.linspace(100, 900, 9), np.linspace(1000, 9000, 9), np.linspace(10000, 90000, 9), np.array([1e5, sample_size, 5e5, 1e6, 2e6, 5e6, 1e7, 2e7, 5e7])]).flatten()
+sample_size = 1e5
 
 #print "k_bar\t\tk_hat\t\tbeta\tb_hat\terr\tp\tr\tmu\tN"
 print "k_bar\tk_hat\tbeta\tb_hat\terr\tp\tr\tmu\tN"
 #print "-----\t\t"*2 + "-----\t"*7
 print "-----\t"*9
 
-#for contrast in contrasts:
+for contrast in contrasts:
 #for k_bar in k_bars:
-for sample_size in sample_sizes:
 
     Bk = k_bar * contrast
     p = Bk / (Bk + 1.0)
