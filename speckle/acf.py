@@ -1,16 +1,11 @@
 
 """
-This file contains the main functions for computing quantities of interest for
-speckle analysis from CSPAD images.
 """
 
 import os
 
 import numpy as np
-from scipy import optimize
 from scipy.signal import fftconvolve
-from scipy.special import gamma, gammaln
-from scipy.special import psi as digamma
 
 try:
     import psana
@@ -34,18 +29,17 @@ def autocorrelate_image(image):
         of the image. Not normalized.
     """
     
-    
     if len(image.shape) == 3:
         n_images = image.shape[0]
         img_shp  = np.array(image.shape[1:])
     elif len(image.shape) == 2:
         n_images = 1
-        image = image.reshape(1, image.shape[1], image.shape[2])
         img_shp  = np.array(image.shape)
+        image = image.reshape(1, img_shp[0], img_shp[1])
     else:
         raise TypeError('`image` is not a valid shape (must be 2d or 3d)')
 
-    acf = np.zeros(img_shp * 2 + 1)
+    acf = np.zeros(img_shp * 2 - 1)
     
     for i in range(n_images):
         img = image[i]
