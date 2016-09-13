@@ -74,8 +74,8 @@ def speckle_profile(autocorrelation_image, resolution=1.0):
     
     c = np.array(shp - 1)[:,None,None]
 
-    g = np.mgrid[:c[0]*2-1,:c[1]*2-1]
-    r = np.sqrt( np.sum( np.square(np.mgrid[:369,:775] - c), axis=0 ) )
+    g = np.mgrid[:shp[0],:shp[1]]
+    r = np.sqrt( np.sum( np.square(g - c), axis=0 ) )
     
     bins = int(r.max() / resolution)
     
