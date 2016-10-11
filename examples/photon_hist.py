@@ -26,7 +26,7 @@ for ie, evt in enumerate(ds.events()):
     if ie > SHOTS: break
 
 
-bins, diagnostics = fit_photon_hist(adus, plot=True, max_photons=4)
+bins, diagnostics = fit_photon_hist(adus, plot=True, max_photons=6)
 
 photon_counts = np.digitize(adus, bins)
 print 'counts:', np.bincount(photon_counts)
