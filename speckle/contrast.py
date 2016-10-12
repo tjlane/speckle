@@ -114,7 +114,8 @@ def fit_negative_binomial_from_hist(empirical_pmf, method='ml', limit=1e-4):
 
         k_range = np.arange(len(empirical_pmf))
 
-        err = lambda contrast : negative_binomial_pmf(k_range, k_bar, contrast) - empirical_pmf
+        err = lambda contrast : np.square(negative_binomial_pmf(k_range, k_bar, contrast) 
+                                          - empirical_pmf)
         
         c0 = 0.5
         contrast, success = optimize.leastsq(err, c0)
