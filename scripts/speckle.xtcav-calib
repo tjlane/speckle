@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+import argparse
+
+import psana
+from xtcav.GenerateDarkBackground import GenerateDarkBackground
+from xtcav.GenerateLasingOffReference import GenerateLasingOffReference
+
+# next two lines for DEBUG
+#psana.setOption('psana.calib-dir','calib')
+#expt = 'xpptut15'
+
+expt = 'xcsm9816'
+
+parser = argparse.ArgumentParser(description='Create a dark or lasing-off calibration \
+                                              for the XTCAV')
+parser.add_argument('-r', '--run', type=int, help='run number to process')
+parser.add_argument('-d', '--dark',
+                    default=False, action='store_true',
+                    help='process run as a dark')
+parser.add_argument('-o', '--off',
+                    default=False, action='store_true',
+                    help='process run as a lasing off reference')
+args = parser.parse_args()
+
+
+if (args.dark and args.off):
+    raise RuntimeError('Cannot process a run as both a dark and lasing-off!')
+elif args.dark:
+    fill = 'dark'
+elif args.off:
+    fill = 'lasing off'
+else:
+    raise RuntimeError('Must choose either dark (-d) or lasing off (-o) flag!')
+
+print 'Processing %s run %d as an XTCAV %s reference' % (expt, args.run, fill)
+
+
+if args.dark:
+    dark=GenerateDarkBackground()
+    dark.experiment = expt
+    dark.runs       = str(args.run)
+    dark.maxshots   = 1000
+    dark.SetValidityRange(300,302) # delete second run number argument to have the validity range be open-ended ("end")
+    dark.Generate()
+
+if args.off:
+    lazoff=GenerateLasingOffReference()
+    lazoff.experiment        = expt
+    lazoff.runs              = str(args.run)
+    lazoff.maxshots          = 1400
+    lazoff.nb                = 1 # number of bunches
+    lazoff.islandsplitmethod = 'scipyLabel'       # see confluence documentation for how to set this parameter
+    lazoff.groupsize         = 40             # see confluence documentation for how to set this parameter
+    lazoff.SetValidityRange(300,302) # delete second run number argument to have the validity range be open-ended ("end")
+    lazoff.Generate()
+
+
