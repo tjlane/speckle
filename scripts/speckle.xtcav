@@ -1,0 +1,147 @@
+#!/usr/bin/env python
+
+"""
+Analyze XTCAV and FEE spectrum data
+"""
+
+
+import psana
+from xtcav.ShotToShotCharacterization import *
+
+import argparse
+import numpy as np
+
+
+parser = argparse.ArgumentParser(description='Analyze a run of xcsm9816, \
+            specifically the XTCAV and FEE spectrometer. Use MPI!')
+parser.add_argument('-r', '--run', type=int, help='run number to process')
+parser.add_argument('-v', '--visualize',
+                    default=False, action='store_true',
+                    help='whether to plot results or \
+                          not -- USE ONE CORE ONLY w/visual mode')
+args = parser.parse_args()
+
+if args.visualize:
+    from matplotlib import pyplot as plt
+
+
+# >>> create the datasource
+ds_string = 'exp=xcsm9816:run=%s' % args.run
+#ds_string = 'exp=xpptut15:run=%s:smd' % args.run # FOR DEBUG
+print 'Processing: %s' % ds_string
+ds = psana.MPIDataSource(ds_string)
+
+# filepath = 'tmp.h5' # FOR DEBUG
+filepath = '/reg/d/psdm/xcs/xcsm9816/scratch/xtcav/run%04d.h5' % args.run
+smldata = ds.small_data(filepath)
+
+# >>> detectors
+
+# pulse
+gdet    = psana.Detector('FEEGasDetEnergy')
+ebeam   = psana.Detector('EBeam')
+feespec = psana.Detector('FEE-SPEC0')
+
+
+# XTCAV 
+xtcav = ShotToShotCharacterization()
+xtcav.SetEnv(ds.env())
+
+
+# -------------- helper fxns --------------------
+
+def gasdet_energy(event):
+    f = gdet.get(event)
+    if f is None:
+        avg = -1.0
+    else:
+        avg = np.mean([ f.f_11_ENRC(), f.f_12_ENRC(), 
+                        f.f_21_ENRC(), f.f_22_ENRC() ])
+    return avg
+
+
+def nom_durtn(event):
+    ddl_obj = ebeam.get(event)
+    try:
+        durtn = ddl_obj.ebeamPkCurrBC2() / ddl_obj.ebeamDumpCharge()
+    except:
+        durtn = -1.0
+    return durtn
+
+
+# --------------- main loop ---------------------
+
+for ie, evt in enumerate(ds.events()):
+
+    print ie
+
+    xtcav.SetCurrentEvent(evt)
+    agreement_percent, ok = xtcav.ReconstructionAgreement()
+    if not ok:
+        agreement_percent = 0.0
+
+
+    # pulse FWHM
+    fwhms, ok = xtcav.PulseFWHM()
+    if (len(fwhms) == 1) and ok:
+        fwhm = fwhms[0]
+    else:
+        fwhm = -1.0
+
+
+    # pulse power v time
+    time, power, ok = xtcav.XRayPower() 
+    if ok and (len(time) == 1) and (len(power) == 1):
+        time  = time[0]
+        power = power[0]
+    else:
+        #print 'no power for shot %d' % ie
+        time  = -1.0 * np.ones(200)
+        power = -1.0 * np.ones(200)
+
+
+    # spectrometer
+    spec_obj = feespec.get(evt)
+    if spec_obj is not None:
+        spectrum = spec_obj.hproj()
+    else:
+        spectrum = -1.0 * np.ones(2048)
+
+
+    # save data to disk
+    smldata.event(
+                  gasdet_energy_mJ = gasdet_energy(evt),
+                  nominal_durtn_fs = nom_durtn(evt),
+                  fee_spectrum     = spectrum,
+                  xtcav_confidence = agreement_percent,
+                  xtcav_pulse_fwhm = fwhm,
+                  xtcav_time       = time,
+                  xtcav_power      = power,
+                 )
+    
+
+    # if requested, visualize
+    if args.visualize:
+
+        fig = plt.figure(figsize=(12,5))
+
+        ax = plt.subplot(121)
+        ax.imshow(xtcav.ProcessedXTCAVImage()[0][0,:,:], 
+                  interpolation='nearest')
+
+        ax = plt.subplot(122)
+        ax.plot(time, power)
+        ax.set_xlabel('Time (fs)')
+        ax.set_ylabel('Lasing Power (GW)')
+        ax.set_title('Agreement %4.2f' % agreement_percent)
+
+        plt.show()
+ 
+smldata.save()
+if smldata.master:
+    print 'Finishing save to: %s' % filepath
+    smldata.file_handle.close()
+
+
+
+
