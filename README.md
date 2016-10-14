@@ -25,6 +25,7 @@ $ git clone https://github.com/tjlane/speckle.git
 
 3) install speckle
 ```
+ssh psana
 cd speckle
 python setup.py install
 ```
@@ -36,4 +37,9 @@ python acf.py
 ```
 
 the tests have some good example code to steal.
+
+IMPORTANT NOTE: you should use the latest ana build 
+```
+$ sit_setup ana-0.19.15
+```
 

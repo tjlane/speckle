@@ -2,9 +2,6 @@
 
 """
 Search for "TODO" and "NotImplementedError"
-
-
-
 """
 
 
@@ -13,7 +10,9 @@ import psana
 import argparse
 import numpy as np
 
-from skbeam.core.accumulators.binned_statistic import RadialBinnedStatistic
+from speckle.droplet import dropletize
+
+from skbeam.core.accumulators.binned_statistic import RadialBinnedStatistic, BinnedStatistic1D
 
 
 # >>> create the datasource
@@ -24,6 +23,7 @@ args = parser.parse_args()
 ds_string = 'exp=xcsm9816:run=%s' % args.run
 print 'Processing: %s' % ds_string
 ds = psana.MPIDataSource(ds_string)
+smldata = ds.small_data('tmp.h5')
 
 
 # >>> detectors
@@ -34,79 +34,122 @@ ebeam = psana.Detector('EBeam')
 ipm3  = psana.Detector('XCS-IPM-03')
 ipm4  = psana.Detector('XCS-IPM-04')
 ipm5  = psana.Detector('XCS-IPM-05')
+ipm6  = psana.Detector('XCS-IPM-gon')
+evr   = psana.Detector('evr0')
 
 # cameras
-cspad = None # TODO
-epix  = None # TODO
+cspad_shape = (2, 185, 388)
+epix_shape  = (704, 768)
+
+cspad = psana.Detector('cspad2x2_diff')
+epix_dets = {'epix_1' : psana.Detector('epix_1'),
+             'epix_2' : psana.Detector('epix_2'),
+             'epix_3' : psana.Detector('epix_3'),
+             'epix_4' : psana.Detector('epix_4')}
 
 
 # >>> summary data
-cspad_sum = 
-epix_sum  =
-epix_acf  = 
+cspad_sum = np.zeros(cspad_shape)
+cspad_summed_shots = 0
 
 # GEOMETRY....
+cspad_qs = np.ones(cspad_shape)        # TEMP
+epix_qs  = [np.ones(epix_shape),] * 4  # TEMP
 
-# XTCAV UNITS
+cspad_radint_bins = 100
+epix_radint_bins  = 100
+
+cspad_radint = BinnedStatistic1D(cspad_qs.flatten(),
+                                 statistic='mean',
+                                 bins=cspad_radint_bins,
+                                 range=None,
+                                 mask=None)
+
+epix_radints = {}
+for ix, epix_name in enumerate(sorted(epix_dets.keys())):    
+    epix_radints[epix_name] = BinnedStatistic1D(epix_qs[ix].flatten(),
+                                                statistic='mean',
+                                                bins=epix_radint_bins,
+                                                range=None,
+                                                mask=None)
+
 
 
 # -------------- helper fxns --------------------
 
+def notnone(x):
+    if x is None:
+        return -1.0
+    else:
+        return x
+
 def gasdet_energy(event):
     f = fee.get(event)
-    avg = np.mean([ f.f_11_ENRC(), f.f_12_ENRC(), 
-                    f.f_21_ENRC,() f.f_22_ENRC() ])
+    if f is not None:
+        avg = np.mean([ f.f_11_ENRC(), f.f_12_ENRC(), 
+                        f.f_21_ENRC(), f.f_22_ENRC() ])
+    else:
+        avg = -1.0
     return avg
-
-
-def nom_durtn(event):
-    #durtn = ebeamPkCurrBC2() / ebeamDumpCharge()
-    return durtn
-
-
-def xtcav_power_v_time(event):
-    raise NotImplementedError()
-    return
-
 
 # --------------- main loop ---------------------
 
 for ie, evt in enumerate(ds.events()):
 
-
+    print ie
 
     # TODO decide if event is a hit or not
-
+    event_codes = evr(evt)
+    xrays_on = int((162 not in event_codes))
 
     # shot summary data
-    smldata.event({'pulse' : { 'gasdet_energy_mJ'   : gasdet_energy(event)
-                               'IMP-03'             : ipm3.sum(evt)
-                               'IMP-04'             : ipm4.sum(evt)
-                               'IMP-05'             : ipm5.sum(evt)
-                               'nominal_durtn_fs'   : nom_durtn(event)
-                               'xtcav_power_v_time' : xtcav_power_v_time(event)
-                               'fee_spectrum'       : 
+    smldata.event({'pulse' : { 'gasdet_energy_mJ'   : gasdet_energy(evt),
+                               'IPM_03'             : notnone( ipm3.sum(evt) ),
+                               'IPM_04'             : notnone( ipm4.sum(evt) ),
+                               'IPM_05'             : notnone( ipm5.sum(evt) ),
+                               'IPM_gon'            : notnone( ipm6.sum(evt) ),
+                               'xrays_on'           : xrays_on
                                 }})
-
-
 
 
     # cspad analysis
     cspad_calib = cspad.calib(evt)
-    cspad_sum  += cspad_calib
-    cspad_lo    = 
-    smldata.event({'cspad' : {'lineout'  : }})
+    if cspad_calib is not None:
+        cspad_sum  += cspad_calib
+        cspad_summed_shots += 1
+        cspad_lo = cspad_radint(cspad_calib.flatten())
+    else:
+        cspad_lo = np.zeros(cspad_radint_bins)
+        
+    smldata.event({'cspad' : {'lineout'  : cspad_lo}})
 
     # epix analysis
-    smldata.event({'epix' : {'lineout'  :
-                             'adus'     :
-                             'photons'  :
-                             'contrast' :
+    for name in ['epix_1', 'epix_2', 'epix_3', 'epix_4']:
+        
+        detector = epix_dets[name]
+
+        adus = np.zeros(1000)
+
+        img = detector.calib(evt)
+        if img is not None:
+            x = dropletize(img)
+            adus[:len(x)] = x
+            epix_lo = epix_radints[name](img.flatten())
+        else:
+            epix_lo = np.zeros(epix_radint_bins)
+
+        smldata.event({name : {'lineout'  : epix_lo,
+                               'adus'     : adus}})
+
+    if ie > 80: break
+
+
+
+smldata.save({'cspad' : {'sum' : cspad_sum,
+                         'summed_shots' : cspad_summed_shots}})
+
+if smldata.master:
+    smldata.file_handle.close()
+    print 'SMALLDATA DONE'
     
-
-
-                  
-
-
-
 
