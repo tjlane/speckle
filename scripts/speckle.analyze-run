@@ -20,7 +20,7 @@ parser = argparse.ArgumentParser(description='Analyze a run of xcsm9816. Use MPI
 parser.add_argument('-r', '--run', type=int, help='run number to process')
 args = parser.parse_args()
 
-ds_string = 'exp=xcsm9816:run=%s' % args.run
+ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
 print 'Processing: %s' % ds_string
 ds = psana.MPIDataSource(ds_string)
 smldata = ds.small_data('tmp.h5')
@@ -121,7 +121,7 @@ for ie, evt in enumerate(ds.events()):
     else:
         cspad_lo = np.zeros(cspad_radint_bins)
         
-    smldata.event({'cspad' : {'lineout'  : cspad_lo}})
+    smldata.event({'cspad' : {'lineout' : cspad_lo}})
 
     # epix analysis
     for name in ['epix_1', 'epix_2', 'epix_3', 'epix_4']:
@@ -140,8 +140,6 @@ for ie, evt in enumerate(ds.events()):
 
         smldata.event({name : {'lineout'  : epix_lo,
                                'adus'     : adus}})
-
-    if ie > 80: break
 
 
 

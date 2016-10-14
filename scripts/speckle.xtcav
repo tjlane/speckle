@@ -26,7 +26,7 @@ if args.visualize:
 
 
 # >>> create the datasource
-ds_string = 'exp=xcsm9816:run=%s' % args.run
+ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
 #ds_string = 'exp=xpptut15:run=%s:smd' % args.run # FOR DEBUG
 print 'Processing: %s' % ds_string
 ds = psana.MPIDataSource(ds_string)
