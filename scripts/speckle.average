@@ -61,15 +61,17 @@ def notnone(x):
 
 for ie, evt in enumerate(ds.events()):
 
-    print ie
-
     # TODO decide if event is a hit or not
     event_codes = evr(evt)
     xrays_on = int((162 not in event_codes))
+    smldata.event(xrays_on=xrays_on)
 
     # cspad analysis
     cspad_calib = cspad.calib(evt)
     if cspad_calib is not None:
+
+        print ie, summed_shots
+
         cspad_sum  += cspad_calib
         summed_shots += 1
         
@@ -79,7 +81,16 @@ for ie, evt in enumerate(ds.events()):
         epix_4_sum += epix_4.calib(evt)
 
 
+smldata.sum(summed_shots)
+smldata.sum(cspad_sum)
+smldata.sum(epix_1_sum)
+smldata.sum(epix_1_sum)
+smldata.sum(epix_1_sum)
+smldata.sum(epix_1_sum)
+
+
 smldata.save(summed_shots=summed_shots,
+             cspad_sum=cspad_sum,
              epix_1_sum=epix_1_sum,
              epix_2_sum=epix_2_sum,
              epix_3_sum=epix_3_sum,

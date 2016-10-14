@@ -141,6 +141,9 @@ for ie, evt in enumerate(ds.events()):
 
 
 
+smldata.sum(cspad_sum)
+smldata.sum(cspad_summed_shots)
+
 smldata.save({'cspad' : {'sum' : cspad_sum,
                          'summed_shots' : cspad_summed_shots}})
 

@@ -5,10 +5,11 @@ HUTCH='xcs'
 
 SUBCMD="bsub -q psfehq -o /reg/d/psdm/xcs/xcsm9816/scratch/logs/latest.log hostname"
 
-LASTFILE=`ls /reg/d/psdm/xcs/xcsm9816/scratch/runsummary/*.h5 | tail -n 1`
-LASTRUN=`basename -s .h5 $LASTFILE | tr -cd '0-9'`
 
 while true; do
+
+    LASTFILE=`ls /reg/d/psdm/xcs/xcsm9816/scratch/runsummary/*.h5 | tail -n 1`
+    LASTRUN=`basename -s .h5 $LASTFILE | tr -cd '0-9'`
 
 	CREATE_TIME=`date '+%m/%d/%Y_%H:%M:%S'`
 	EXP_RUN=`python /reg/g/xpp/scripts/get_curr_exp_python --hutch XCS --run`
