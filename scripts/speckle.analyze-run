@@ -23,7 +23,7 @@ args = parser.parse_args()
 ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
 print 'Processing: %s' % ds_string
 ds = psana.MPIDataSource(ds_string)
-smldata = ds.small_data('tmp.h5')
+smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/runsummary/run%04d.h5' % args.run)
 
 
 # >>> detectors
