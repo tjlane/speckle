@@ -31,8 +31,7 @@ smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/runsummary/run%04d.h5'
 # pulse
 fee   = psana.Detector('FEEGasDetEnergy')
 ebeam = psana.Detector('EBeam')
-ipm3  = psana.Detector('XCS-IPM-03')
-ipm4  = psana.Detector('XCS-IPM-04')
+ipm2  = psana.Detector('XCS-IPM-02')
 ipm5  = psana.Detector('XCS-IPM-05')
 ipm6  = psana.Detector('XCS-IPM-gon')
 evr   = psana.Detector('evr0')
@@ -104,8 +103,7 @@ for ie, evt in enumerate(ds.events()):
 
     # shot summary data
     smldata.event({'pulse' : { 'gasdet_energy_mJ'   : gasdet_energy(evt),
-                               'IPM_03'             : notnone( ipm3.sum(evt) ),
-                               'IPM_04'             : notnone( ipm4.sum(evt) ),
+                               'IPM_02'             : notnone( ipm2.sum(evt) ),
                                'IPM_05'             : notnone( ipm5.sum(evt) ),
                                'IPM_gon'            : notnone( ipm6.sum(evt) ),
                                'xrays_on'           : xrays_on
