@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+
+"""
+Search for "TODO" and "NotImplementedError"
+"""
+
+
+import psana
+
+import argparse
+import numpy as np
+
+
+# >>> create the datasource
+parser = argparse.ArgumentParser(description='Analyze a run of xcsm9816. Use MPI!')
+parser.add_argument('-r', '--run', type=int, help='run number to process')
+args = parser.parse_args()
+
+ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
+print 'Processing: %s' % ds_string
+ds = psana.MPIDataSource(ds_string)
+smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/averages/run%04d.h5' % args.run)
+
+
+# >>> detectors
+
+# pulse
+evr   = psana.Detector('evr0')
+
+# cameras
+cspad_shape = (2, 185, 388)
+epix_shape  = (704, 768)
+
+cspad = psana.Detector('cspad2x2_diff')
+epix_1 = psana.Detector('epix_1')
+epix_2 = psana.Detector('epix_2')
+epix_3 = psana.Detector('epix_3')
+epix_4 = psana.Detector('epix_4')
+
+
+# >>> summary data
+cspad_sum = np.zeros(cspad_shape)
+summed_shots = 0
+
+epix_1_sum = np.zeros(epix_shape)
+epix_2_sum = np.zeros(epix_shape)
+epix_3_sum = np.zeros(epix_shape)
+epix_4_sum = np.zeros(epix_shape)
+
+
+# -------------- helper fxns --------------------
+
+def notnone(x):
+    if x is None:
+        return -1.0
+    else:
+        return x
+
+
+# --------------- main loop ---------------------
+
+for ie, evt in enumerate(ds.events()):
+
+    print ie
+
+    # TODO decide if event is a hit or not
+    event_codes = evr(evt)
+    xrays_on = int((162 not in event_codes))
+
+    # cspad analysis
+    cspad_calib = cspad.calib(evt)
+    if cspad_calib is not None:
+        cspad_sum  += cspad_calib
+        summed_shots += 1
+        
+        epix_1_sum += epix_1.calib(evt)
+        epix_2_sum += epix_2.calib(evt)
+        epix_3_sum += epix_3.calib(evt)
+        epix_4_sum += epix_4.calib(evt)
+
+
+smldata.save(summed_shots=summed_shots,
+             epix_1_sum=epix_1_sum,
+             epix_2_sum=epix_2_sum,
+             epix_3_sum=epix_3_sum,
+             epix_4_sum=epix_4_sum)
+
+if smldata.master:
+    smldata.file_handle.close()
+    print 'SMALLDATA DONE'
+    
+
