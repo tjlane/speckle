@@ -128,7 +128,7 @@ for ie, evt in enumerate(ds.events()):
         
         detector = epix_dets[name]
 
-        adus = np.zeros(1000)
+        adus = np.zeros(10000)
 
         img = detector.calib(evt)
         if img is not None:
