@@ -40,12 +40,19 @@ def autocorrelate_image(image):
         raise TypeError('`image` is not a valid shape (must be 2d or 3d)')
 
     acf = np.zeros(img_shp * 2 - 1)
+    #norm = np.zeros_like(acf)
+    n_pix = np.product(img_shp)
     
     for i in range(n_images):
         img = image[i]
         x = img - img.mean()
         acf += fftconvolve(x, x[::-1,::-1])
-        
+
+        s = np.sum(img)
+        acf[img_shp[0]-1,img_shp[1]-1] -= s
+        acf /= float(np.square(s)) / float(n_pix)
+
+    #acf /= float( n_images ) * norm
     acf /= float( n_images )
         
     return acf
