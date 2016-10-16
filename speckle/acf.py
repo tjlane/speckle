@@ -13,7 +13,7 @@ except ImportError as e:
     print ('Could not import psana, proceeding')
 
 
-def autocorrelate_image(image):
+def autocorrelate_image(image, normalize=True):
     """
     Autocorrelate an image to determine the distribution of speckle sizes.
     
@@ -26,7 +26,7 @@ def autocorrelate_image(image):
     -------
     acf : np.ndarray
         A (`window`, `window`) shape array containing the autocorrelation
-        of the image. Not normalized.
+        of the image.
     """
     
     if len(image.shape) == 3:
@@ -44,16 +44,19 @@ def autocorrelate_image(image):
     n_pix = np.product(img_shp)
     
     for i in range(n_images):
+
         img = image[i]
         x = img - img.mean()
-        acf += fftconvolve(x, x[::-1,::-1])
+        acf_i = fftconvolve(x, x[::-1,::-1])
 
-        s = np.sum(img)
-        acf[img_shp[0]-1,img_shp[1]-1] -= s
-        acf /= float(np.square(s)) / float(n_pix)
+        if normalize:
+            sigma_sq = np.sum(np.square(x))
+            acf_i[img_shp[0]-1,img_shp[1]-1] -= sigma_sq
+            acf_i /= float(sigma_sq * n_pix)
 
-    #acf /= float( n_images ) * norm
-    acf /= float( n_images )
+        acf += acf_i
+
+    acf /= float(n_images)
         
     return acf
     

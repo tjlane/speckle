@@ -7,32 +7,31 @@ from matplotlib import pyplot as plt
 
 from speckle import acf
 
-RUN   = 'exp=xcs01116:run=120'
+#RUN   = 'exp=xcs01116:run=120'
 #RUN   = 'exp=xpptut15:run=263'
+RUN = 'exp=xcsm9816:run=288:smd'
 SHOTS = 20
 
 
 ds = psana.DataSource(RUN)
-epix = psana.Detector('epix100a_ladm')
+epix = psana.Detector('epix_1')
 
-adus = []
-
+imgs = []
 for ie, evt in enumerate(ds.events()):
     print ie
     img = epix.calib(evt)
-    imgs = []
     if img is not None:
         imgs.append(img)
 
     if ie > SHOTS: break
 
-a = acf.autocorrelate_image(img)
+a = acf.autocorrelate_image(np.array(img))
 p = acf.speckle_profile(a)
 
 plt.figure()
 plt.subplot(121)
-plt.imshow(np.log(a), interpolation='nearest')
+plt.imshow(np.log(np.abs(a)), interpolation='nearest')
 plt.subplot(122)
-plt.plot(p)
+plt.plot(p[:,0], p[:,1])
 plt.show()
 
