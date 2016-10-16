@@ -74,11 +74,13 @@ def nom_durtn(event):
 for ie, evt in enumerate(ds.events()):
 
     print ie
+    vis = True
 
     xtcav.SetCurrentEvent(evt)
     agreement_percent, ok = xtcav.ReconstructionAgreement()
     if not ok:
         agreement_percent = 0.0
+        vis = False
 
 
     # pulse FWHM
@@ -98,6 +100,7 @@ for ie, evt in enumerate(ds.events()):
         #print 'no power for shot %d' % ie
         time  = -1.0 * np.ones(200)
         power = -1.0 * np.ones(200)
+        vis = False
 
 
     # spectrometer
@@ -121,19 +124,23 @@ for ie, evt in enumerate(ds.events()):
     
 
     # if requested, visualize
-    if args.visualize:
+    if args.visualize and vis:
 
         fig = plt.figure(figsize=(12,5))
 
-        ax = plt.subplot(121)
+        ax = plt.subplot(131)
         ax.imshow(xtcav.ProcessedXTCAVImage()[0][0,:,:], 
-                  interpolation='nearest')
+                  interpolation='nearest', aspect='auto')
 
-        ax = plt.subplot(122)
+        ax = plt.subplot(132)
         ax.plot(time, power)
         ax.set_xlabel('Time (fs)')
         ax.set_ylabel('Lasing Power (GW)')
         ax.set_title('Agreement %4.2f' % agreement_percent)
+
+        ax = plt.subplot(133)
+        ax.plot(spectrum)
+        ax.set_title('FEE Spectrum')
 
         plt.show()
  

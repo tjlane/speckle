@@ -62,32 +62,48 @@ def fit_negative_binomial_from_hist(empirical_pmf, method='ml', limit=1e-4):
 
     Parameters
     ----------
+    samples : np.ndarray, int
+        An array of the photon counts for each pixel.
     
+    method : str, {"ml", "expansion", "lsq"}
+        Which method to use to estimate the contrast.
+
+    limit : float
+        If method == 'ml', then this sets the lower limit for which contrast
+        can be evaluated. Note that the solution can be sensitive to this
+        value.    
+
     Returns
     -------
+    contrast : float
+        The contrast of the samples.
+        
+    sigma_contrast : float
+        The first moment of the parameter estimation function
 
     See Also
     --------
     fit_negative_binomial : function
     """
     
-    #k = samples.flatten()
     N = float( empirical_pmf.sum() )
     n = np.arange( len(empirical_pmf) )
-    k_bar = np.sum(n * empirical_pmf) / N #np.mean(samples)
+    k_bar = float(np.sum(n * empirical_pmf)) / N 
+    if k_bar == 0.0:
+        return 0.0, 0.0
     pmf = empirical_pmf # just a shorthand
-    #print "k_bar", k_bar
     
     if method == 'ml': # use maximium likelihood estimation
-        
-        def logL_prime(contrast):
-            M = 1.0 / contrast
-            t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
-            t2 = np.sum( pmf * ((k_bar - n) / (k_bar + M) + digamma(n + M)) )
-            return t1 + t2
+
+        def logL_prime(M):
+            t1 = np.sum([ pmf[n] * digamma(n + M) for n in range(len(pmf)) ])
+            t2 = -N * digamma(M)
+            t3 = N * np.log(M / (M + k_bar))
+            return t1 + t2 + t3
        
         try: 
-            contrast = optimize.brentq(logL_prime, limit, 1.0)
+            M_hat = optimize.brentq(logL_prime, 1.0, 1000.0, maxiter=10000)
+            contrast = 1.0 / M_hat
         except ValueError as e:
             print e
             #raise ValueError('log-likelihood function has no maximum given'
@@ -109,26 +125,50 @@ def fit_negative_binomial_from_hist(empirical_pmf, method='ml', limit=1e-4):
         if sigma_contrast < 0.0:
             raise RuntimeError('Maximum likelihood optimization found a local '
                                'minimum instead of maximum! sigma = %s' % sigma_contrast) 
+
+    elif method == 'ml_nodiv':
+
+        def neglogL(M):
+            r = M / k_bar
+            t1 = gammaln(pmf + M) - gammaln(pmf + 1.0) - gammaln(M)
+            t2 = - pmf * np.log(1.0 + r)
+            t3 = - M *   np.log(1.0 + 1.0/r)
+            return -1.0 * np.sum(t1 + t2 + t3)
+
+        M_hat = optimize.brent(neglogL, brack=(1.0,1.0/limit))
+        contrast = 1.0 / M_hat
+        sigma_contrast = 0.0
+            
     
     elif method == 'lsq': # use least-squares fit
 
-        k_range = np.arange(len(empirical_pmf))
+        k_range = len(empirical_pmf)
+        norm_pmf = empirical_pmf.astype(np.float) / (np.sum(empirical_pmf) + 1.0e-8)
 
-        err = lambda contrast : np.square(negative_binomial_pmf(k_range, k_bar, contrast) 
-                                          - empirical_pmf)
+        def lsq_error(args):
+            c, scale = args
+            return negative_binomial_pmf(k_range, k_bar, c) - scale*empirical_pmf
         
-        c0 = 0.5
-        contrast, success = optimize.leastsq(err, c0)
-        if success:
-            contrast = contrast[0]
-            sigma_contrast = success
-        else:
-            raise RuntimeError('least-squares fit did not converge.')
-    
+        def brute_error(c):
+            a = norm_pmf
+            b = negative_binomial_pmf(k_range, k_bar, c)
+            return np.sum(np.abs(a - b))
+
+        #contrast = optimize.golden(error, brack=(limit, 0.99999))
+
+        #a0 = (0.5, 1.0/np.sum(empirical_pmf))
+        #res, success = optimize.leastsq(error, a0)
+        #contrast = res[0]
+
+
+        contrast = optimize.brute(brute_error, [(limit, 1.0)], Ns=100)
+
+        sigma_contrast = 0.0
+
     elif method == 'expansion': # use low-order expansion
         # directly from the SI of the paper in the doc string
-        p1 = empirical_pmf[1]
-        p2 = empirical_pmf[2]
+        p1 = float(empirical_pmf[1]) / np.sum(empirical_pmf)
+        p2 = float(empirical_pmf[2]) / np.sum(empirical_pmf)
         contrast = (2.0 * p2 * (1.0 - p1) / np.square(p1)) - 1.0
         
         # this is not quite what they recommend, but it's close...
@@ -165,40 +205,10 @@ def negative_binomial_pmf(k_range, k_bar, contrast):
 
     M = 1.0 / contrast
     norm = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range+1))
-    f1 = np.power(1.0 + M/k_bar, -k_range)
+    f1 = np.power(1.0 + M/k_bar, -np.arange(k_range))
     f2 = np.power(1.0 + k_bar/M, -M)
     
     return norm * f1 * f2
 
 
 
-def negative_binomial_ef(k_range, k_bar, contrast):
-    """
-    Evaluate the negative binomial probablility error function.
-    
-    Parameters
-    ----------
-    k_range : ndarray, int
-        The integer values in the domain of the PMF to evaluate.
-        
-    k_bar : float
-        The mean count density. Greater than zero.
-        
-    contrast : float
-        The contrast parameter, in [0.0, 1.0).
-        
-    Returns
-    -------
-    pmf : np.ndarray, float
-        The normalized pmf for each point in `k_range`.
-    """
-    
-    M = 1.0 / contrast
-    norm = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range+1))
-    f1 = np.power(1.0 + M/k_bar, -k_range)
-    f2 = np.power(1.0 + k_bar/M, -M)
-    
-    return norm * f1 * f2
-
-    
-    

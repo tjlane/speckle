@@ -48,7 +48,7 @@ if args.off:
     lazoff=GenerateLasingOffReference()
     lazoff.experiment        = expt
     lazoff.runs              = str(args.run)
-    lazoff.maxshots          = 1400
+    lazoff.maxshots          = 700
     lazoff.nb                = 1 # number of bunches
     lazoff.islandsplitmethod = 'scipyLabel'       # see confluence documentation for how to set this parameter
     lazoff.groupsize         = 40             # see confluence documentation for how to set this parameter
