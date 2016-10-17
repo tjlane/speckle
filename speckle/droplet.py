@@ -14,7 +14,7 @@ except ImportError as e:
     _SKBEAM = False
     
 
-def dropletize(img, threshold=10.0, dilate=1, return_coms=False):
+def dropletize(img, threshold=10.0, dilate=1, return_all=False):
     """
     A simple and very effective threshold-based droplet algorithm.
 
@@ -55,10 +55,11 @@ def dropletize(img, threshold=10.0, dilate=1, return_coms=False):
 
     adus = smt.sum(img, labels=limg, index=np.arange(2,numlabels))
 
-    if return_coms:
+    if return_all:
         coms = np.array(smt.center_of_mass(img, labels=limg,
                                         index=np.arange(2,numlabels))) 
-        return adus, coms
+        size = smt.sum(np.ones_like(img), labels=limg, index=np.arange(2,numlabels))
+        return adus, coms, size
 
     else:
         return adus

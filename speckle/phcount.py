@@ -68,7 +68,7 @@ def fit_photon_hist(counts, adu_per_photon=150.0, max_photons=None, plot=False):
     # (we'll just take the mid points between the peaks)
     centers = np.array([popt[3*i] for i in range(p_max)])
     bins_to_use = (centers[:-1] + centers[1:]) / 2.0
-
+    bins_to_use = np.concatenate(([0], bins_to_use))
 
     if plot:
 
@@ -80,6 +80,8 @@ def fit_photon_hist(counts, adu_per_photon=150.0, max_photons=None, plot=False):
         plt.vlines(bins_to_use, 0.0, fit.max())
         plt.xlabel('Droplet ADU')
         plt.ylabel('Observations')
+        plt.yscale('log')
+        plt.ylim([1, np.max(bcnt) * 1.5])
 
         if type(plot) == str:
             plt.savefig(plot)
