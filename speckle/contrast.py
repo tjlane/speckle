@@ -17,8 +17,8 @@ try:
 except ImportError as e:
     print ('Could not import psana, proceeding')
 
-    
-    
+
+
 def fit_negative_binomial(samples, method='ml', limit=1e-4):
     """
     Estimate the parameters of a negative binomial distribution, using either
@@ -50,8 +50,83 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
     ----------
     ..[1] PRL 109, 185502 (2012)
     """
-    h = np.bincount(samples)
-    return fit_negative_binomial_from_hist(h, method=method, limit=limit)
+    
+    # copied from 347fe0e --TJL
+
+    k = samples.flatten()
+    N = float( len(k) )
+    k_bar = np.mean(samples)
+    
+    if method == 'ml': # use maximium likelihood estimation
+        
+        def logL_prime(contrast):
+            M = 1.0 / contrast
+            t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
+            t2 = np.sum( (k_bar - k)/(k_bar + M) + digamma(k + M) )
+            return t1 + t2
+       
+        try: 
+            contrast = optimize.brentq(logL_prime, limit, 1.0)
+        except ValueError as e:
+            print e
+            #raise ValueError('log-likelihood function has no maximum given'
+            #                 ' the empirical example provided. Please samp'
+            #                 'le additional points and try again.')
+            contrast = limit
+            sigma_contrast = 1.0
+            return contrast, sigma_contrast
+        
+        def logL_dbl_prime(contrast):
+            M = 1.0 / (contrast + 1e-100)
+            t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
+            t2 = - N * digamma(M)
+            t3 = np.sum( digamma(k + M) )
+            return t1 + t2 + t3
+            
+        sigma_contrast = logL_dbl_prime(contrast)
+        if sigma_contrast < 0.0:
+            raise RuntimeError('Maximum likelihood optimization found a local '
+                               'minimum instead of maximum! sigma = %s' % sigma_contrast) 
+    
+    elif method == 'lsq': # use least-squares fit
+
+        empirical_pmf = np.bincount(samples)
+        k_range = np.arange(len(empirical_pmf))
+        #print empirical_pmf, k_range, k_bar
+
+        err = lambda contrast : negative_binomial_pmf(k_range, k_bar, contrast) - empirical_pmf
+        #def err(contrast):
+        #    print k_range, k_bar, contrast
+        #    return negative_binomial_pmf(k_range, k_bar, contrast) - empirical_pmf
+
+        
+        c0 = 0.5
+        contrast, success = optimize.leastsq(err, c0)
+        if success:
+            contrast = contrast[0]
+            sigma_contrast = success
+        else:
+            raise RuntimeError('least-squares fit did not converge.')
+    
+    elif method == 'expansion': # use low-order expansion
+        # directly from the SI of the paper in the doc string
+        p1 = np.sum( k == 1 ) / N
+        p2 = np.sum( k == 2 ) / N
+        contrast = (2.0 * p2 * (1.0 - p1) / np.square(p1)) - 1.0
+        
+        # this is not quite what they recommend, but it's close...
+        # what they recommend is a bit confusing to me atm --TJL
+        sigma_contrast = np.power(2.0 * (1.0 + contrast) / N, 0.5) / k_bar
+        
+        
+    else:
+        raise ValueError('`method` must be one of {"ml", "ls", "expansion"}')
+    
+    return contrast, sigma_contrast    
+    
+
+    #h = np.bincount(samples)
+    #return fit_negative_binomial_from_hist(h, method=method, limit=limit)
 
 
 def fit_negative_binomial_from_hist(empirical_pmf, method='ml', limit=1e-4):
@@ -203,12 +278,25 @@ def negative_binomial_pmf(k_range, k_bar, contrast):
         The normalized pmf for each point in `k_range`.
     """
 
+    if type(k_range) == int:
+        k_range = np.arange(k_range)
+    elif type(k_range) == np.ndarray:
+        pass
+    else:
+        raise ValueError('invalid type for k_range: %s' % type(k_range))
+
     M = 1.0 / contrast
     norm = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range+1))
-    f1 = np.power(1.0 + M/k_bar, -np.arange(k_range))
+    f1 = np.power(1.0 + M/k_bar, -k_range)
     f2 = np.power(1.0 + k_bar/M, -M)
     
     return norm * f1 * f2
 
+
+def negative_binomial_samples(k_bar, contrast, size=1):
+    M = 1.0 / contrast
+    p = 1.0 / (k_bar/M + 1.0)
+    samples = np.random.negative_binomial(M, p, size=size)
+    return samples
 
 
