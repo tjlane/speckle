@@ -3,8 +3,10 @@
 import argparse
 
 import psana
-from xtcav.GenerateDarkBackground import GenerateDarkBackground
-from xtcav.GenerateLasingOffReference import GenerateLasingOffReference
+#from xtcav.GenerateDarkBackground import GenerateDarkBackground
+#from xtcav.GenerateLasingOffReference import GenerateLasingOffReference
+from speckle.GenerateDarkBackground import GenerateDarkBackground
+from speckle.GenerateLasingOffReference import GenerateLasingOffReference
 
 # next two lines for DEBUG
 #psana.setOption('psana.calib-dir','calib')
@@ -21,6 +23,7 @@ parser.add_argument('-d', '--dark',
 parser.add_argument('-o', '--off',
                     default=False, action='store_true',
                     help='process run as a lasing off reference')
+parser.add_argument('-m', '--max', type=int, help='max shots to use', default=1000)
 args = parser.parse_args()
 
 
@@ -40,7 +43,7 @@ if args.dark:
     dark=GenerateDarkBackground()
     dark.experiment = expt
     dark.runs       = str(args.run)
-    dark.maxshots   = 1000
+    dark.maxshots   = args.max
     dark.SetValidityRange(args.run) # delete second run number argument to have the validity range be open-ended ("end")
     dark.Generate()
 
@@ -48,7 +51,7 @@ if args.off:
     lazoff=GenerateLasingOffReference()
     lazoff.experiment        = expt
     lazoff.runs              = str(args.run)
-    lazoff.maxshots          = 1400
+    lazoff.maxshots          = args.max
     lazoff.nb                = 1 # number of bunches
     lazoff.islandsplitmethod = 'scipyLabel'       # see confluence documentation for how to set this parameter
     lazoff.groupsize         = 40             # see confluence documentation for how to set this parameter
