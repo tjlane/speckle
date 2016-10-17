@@ -41,18 +41,18 @@ if args.dark:
     dark.experiment = expt
     dark.runs       = str(args.run)
     dark.maxshots   = 1000
-    dark.SetValidityRange(300,302) # delete second run number argument to have the validity range be open-ended ("end")
+    dark.SetValidityRange(args.run) # delete second run number argument to have the validity range be open-ended ("end")
     dark.Generate()
 
 if args.off:
     lazoff=GenerateLasingOffReference()
     lazoff.experiment        = expt
     lazoff.runs              = str(args.run)
-    lazoff.maxshots          = 700
+    lazoff.maxshots          = 1400
     lazoff.nb                = 1 # number of bunches
     lazoff.islandsplitmethod = 'scipyLabel'       # see confluence documentation for how to set this parameter
     lazoff.groupsize         = 40             # see confluence documentation for how to set this parameter
-    lazoff.SetValidityRange(300,302) # delete second run number argument to have the validity range be open-ended ("end")
+    lazoff.SetValidityRange(args.run) # delete second run number argument to have the validity range be open-ended ("end")
     lazoff.Generate()
 
 
