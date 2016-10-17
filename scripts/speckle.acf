@@ -10,6 +10,7 @@ import psana
 import argparse
 import numpy as np
 
+from speckle.acf import autocorrelate_image
 
 # >>> create the datasource
 parser = argparse.ArgumentParser(description='Analyze a run of xcsm9816. Use MPI!')
@@ -20,7 +21,7 @@ args = parser.parse_args()
 ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
 print 'Processing: %s' % ds_string
 ds = psana.MPIDataSource(ds_string)
-smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/averages/run%04d.h5' % args.run)
+smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/acfs/run%04d.h5' % args.run)
 
 
 # >>> detectors
@@ -29,10 +30,11 @@ smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/averages/run%04d.h5' %
 evr   = psana.Detector('evr0')
 
 # cameras
-cspad_shape = (2, 185, 388)
+#cspad_shape = (2, 185, 388)
 epix_shape  = (704, 768)
+epix_acf_shape = (1407, 1535)
 
-cspad = psana.Detector('cspad2x2_diff')
+#cspad = psana.Detector('cspad2x2_diff')
 epix_1 = psana.Detector('epix_1')
 epix_2 = psana.Detector('epix_2')
 epix_3 = psana.Detector('epix_3')
@@ -40,13 +42,13 @@ epix_4 = psana.Detector('epix_4')
 
 
 # >>> summary data
-cspad_sum = np.zeros(cspad_shape)
+#cspad_sum = np.zeros(cspad_shape)
 summed_shots = 0
 
-epix_1_sum = np.zeros(epix_shape)
-epix_2_sum = np.zeros(epix_shape)
-epix_3_sum = np.zeros(epix_shape)
-epix_4_sum = np.zeros(epix_shape)
+epix_1_acf_sum = np.zeros(epix_acf_shape)
+epix_2_acf_sum = np.zeros(epix_acf_shape)
+epix_3_acf_sum = np.zeros(epix_acf_shape)
+epix_4_acf_sum = np.zeros(epix_acf_shape)
 
 
 # -------------- helper fxns --------------------
@@ -64,42 +66,46 @@ for ie, evt in enumerate(ds.events()):
 
     # TODO decide if event is a hit or not
     event_codes = evr(evt)
+    if not event_codes:
+        continue
     xrays_on = int((162 not in event_codes))
     smldata.event(xrays_on=xrays_on)
 
     # cspad analysis
-    cspad_calib = cspad.calib(evt)
-    if cspad_calib is not None:
+    #cspad_calib = cspad.calib(evt)
+    if xrays_on:
 
         print ie, summed_shots
 
-        cspad_sum  += cspad_calib
+        #cspad_sum  += cspad_calib
         summed_shots += 1
         if args.nshots > 0 and summed_shots >= args.nshots:
             print "Reached %d summed shots, breaking loop.." % summed_shots
             break
         
-        epix_1_sum += epix_1.calib(evt)
-        epix_2_sum += epix_2.calib(evt)
-        epix_3_sum += epix_3.calib(evt)
-        epix_4_sum += epix_4.calib(evt)
+        epix_1_acf_sum += autocorrelate_image(epix_1.calib(evt))
+        epix_2_acf_sum += autocorrelate_image(epix_2.calib(evt))
+        epix_3_acf_sum += autocorrelate_image(epix_3.calib(evt))
+        epix_4_acf_sum += autocorrelate_image(epix_4.calib(evt))
 
 
 smldata.sum(summed_shots)
-smldata.sum(cspad_sum)
-smldata.sum(epix_1_sum)
-smldata.sum(epix_1_sum)
-smldata.sum(epix_1_sum)
-smldata.sum(epix_1_sum)
+#smldata.sum(cspad_sum)
+smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acf_sum)
 
 
 smldata.save(summed_shots=summed_shots,
-             cspad_sum=cspad_sum,
-             epix_1_sum=epix_1_sum,
-             epix_2_sum=epix_2_sum,
-             epix_3_sum=epix_3_sum,
-             epix_4_sum=epix_4_sum)
+             #cspad_sum=cspad_sum,
+             epix_1_acf_sum=epix_1_acf_sum,
+             epix_2_acf_sum=epix_2_acf_sum,
+             epix_3_acf_sum=epix_3_acf_sum,
+             epix_4_acf_sum=epix_4_acf_sum)
 
 if smldata.master:
     smldata.file_handle.close()
     print 'SMALLDATA DONE'
+    
+
