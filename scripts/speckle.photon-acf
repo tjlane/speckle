@@ -1,0 +1,143 @@
+#!/usr/bin/env python
+
+"""
+Search for "TODO" and "NotImplementedError"
+"""
+
+
+import psana
+
+import argparse
+import numpy as np
+
+from speckle.acf import autocorrelate_image
+
+# >>> create the datasource
+parser = argparse.ArgumentParser(description='Analyze a run of xcsm9816. Use MPI!')
+parser.add_argument('-r', '--run', type=int, help='run number to process')
+parser.add_argument('-n', '--nshots', type=int, help='number of shots to process', default=-1)
+parser.add_argument('-m', '--max', type=int, help='max shots per core', default=0)
+args = parser.parse_args()
+
+ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
+print 'Processing: %s' % ds_string
+ds = psana.MPIDataSource(ds_string)
+smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/photon_acfs/run%04d.h5' % args.run)
+
+
+# >>> detectors
+
+adu_per_photon = 160.0 # for ePix100, a bit over the 1 ph peak at 147
+
+# pulse
+evr  = psana.Detector('evr0')
+ipm6 = psana.Detector('XCS-IPM-gon')
+
+# cameras
+epix_shape  = (704, 768)
+epix_acf_shape = (1407, 1535)
+
+epix_1 = psana.Detector('epix_1')
+epix_2 = psana.Detector('epix_2')
+epix_3 = psana.Detector('epix_3')
+epix_4 = psana.Detector('epix_4')
+
+# masks
+mask_1 = np.load('/reg/d/psdm/xcs/xcsm9816/results/sellberg/masks/mask-droplet_avg_run43_epix1_1000_shots+borders.npy')
+mask_2 = np.load('/reg/d/psdm/xcs/xcsm9816/results/sellberg/masks/mask-droplet_avg_run43_epix2_1000_shots+borders.npy')
+mask_3 = np.load('/reg/d/psdm/xcs/xcsm9816/results/sellberg/masks/mask-droplet_avg_run43_epix3_1000_shots+borders.npy')
+mask_4 = np.load('/reg/d/psdm/xcs/xcsm9816/results/sellberg/masks/mask-droplet_avg_run43_epix4_1000_shots+borders.npy')
+
+# >>> summary data
+#cspad_sum = np.zeros(cspad_shape)
+summed_shots = 0
+
+#epix_1_acf_sum = np.zeros(epix_acf_shape)
+#epix_2_acf_sum = np.zeros(epix_acf_shape)
+#epix_3_acf_sum = np.zeros(epix_acf_shape)
+#epix_4_acf_sum = np.zeros(epix_acf_shape)
+
+epix_1_acfp_sum = np.zeros(epix_acf_shape)
+epix_2_acfp_sum = np.zeros(epix_acf_shape)
+epix_3_acfp_sum = np.zeros(epix_acf_shape)
+epix_4_acfp_sum = np.zeros(epix_acf_shape)
+
+
+# -------------- helper fxns --------------------
+
+def notnone(x):
+    if x is None:
+        return -1.0
+    else:
+        return x
+
+
+# --------------- main loop ---------------------
+
+for ie, evt in enumerate(ds.events()):
+
+    # TODO decide if event is a hit or not
+    event_codes = evr(evt)
+    if not event_codes:
+        continue
+    xrays_on = int((162 not in event_codes))
+    if not xrays_on:
+        continue
+
+    ipm6_power = ipm6.channel(evt)[0]
+    if ipm6_power < 1.0:
+        continue
+
+    smldata.event(xrays_on=xrays_on, ipm6=ipm6_power)
+
+    if epix_1.calib(evt) is not None:
+
+        print ie, summed_shots
+
+        #cspad_sum  += cspad_calib
+        summed_shots += 1
+        if args.nshots > 0 and summed_shots >= args.nshots:
+            print "Reached %d summed shots, breaking loop.." % summed_shots
+            break
+        
+        #epix_1_acf_sum += autocorrelate_image(epix_1.calib(evt) * mask_1)
+        #epix_2_acf_sum += autocorrelate_image(epix_2.calib(evt) * mask_2)
+        #epix_3_acf_sum += autocorrelate_image(epix_3.calib(evt) * mask_3)
+        #epix_4_acf_sum += autocorrelate_image(epix_4.calib(evt) * mask_4)
+
+        epix_1_acfp_sum += autocorrelate_image(epix_1.photons(evt, adu_per_photon=adu_per_photon) * mask_1)
+        epix_2_acfp_sum += autocorrelate_image(epix_2.photons(evt, adu_per_photon=adu_per_photon) * mask_2)
+        epix_3_acfp_sum += autocorrelate_image(epix_3.photons(evt, adu_per_photon=adu_per_photon) * mask_3)
+        epix_4_acfp_sum += autocorrelate_image(epix_4.photons(evt, adu_per_photon=adu_per_photon) * mask_4)
+
+        if args.max != 0:
+            if summed_shots > args.max:
+                break
+
+smldata.sum(summed_shots)
+#smldata.sum(epix_1_acf_sum)
+#smldata.sum(epix_1_acf_sum)
+#smldata.sum(epix_1_acf_sum)
+#smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acfp_sum)
+smldata.sum(epix_1_acfp_sum)
+smldata.sum(epix_1_acfp_sum)
+smldata.sum(epix_1_acfp_sum)
+
+
+smldata.save(summed_shots=summed_shots,
+#             epix_1_acf_sum=epix_1_acf_sum,
+#             epix_2_acf_sum=epix_2_acf_sum,
+#             epix_3_acf_sum=epix_3_acf_sum,
+#             epix_4_acf_sum=epix_4_acf_sum,
+             epix_1_acfp_sum=epix_1_acfp_sum,
+             epix_2_acfp_sum=epix_2_acfp_sum,
+             epix_3_acfp_sum=epix_3_acfp_sum,
+             epix_4_acfp_sum=epix_4_acfp_sum)
+
+
+if smldata.master:
+    smldata.file_handle.close()
+    print 'SMALLDATA DONE'
+    
+

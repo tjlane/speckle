@@ -52,7 +52,7 @@ def autocorrelate_image(image, normalize=True):
         if normalize:
             sigma_sq = np.sum(np.square(x))
             acf_i[img_shp[0]-1,img_shp[1]-1] -= sigma_sq
-            acf_i /= float(sigma_sq * n_pix)
+            acf_i /= (float(sigma_sq * n_pix) + 1e-16)
 
         acf += acf_i
 
