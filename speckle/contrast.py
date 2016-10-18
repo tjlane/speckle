@@ -88,25 +88,88 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
             raise RuntimeError('Maximum likelihood optimization found a local '
                                'minimum instead of maximum! sigma = %s' % sigma_contrast) 
     
+    
+    elif method == 'ml-nozero': # use maximium likelihood estimation
+        
+        def logL_prime(contrast):
+            
+            M = 1.0 / contrast
+            p = 1.0 / (k_bar / M + 1.0)
+            
+            # this is the non-zeros correction to the norm const (d log N / dr)
+            pr = np.power(1.0 - p, M)
+            t0 = pr * np.log(1.0 - p) / (pr + 1.0) 
+            
+            t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
+            t2 = np.sum( (k_bar - k)/(k_bar + M) + digamma(k + M) )
+            
+            return t0 + t1 + t2
+       
+        try: 
+            contrast = optimize.brentq(logL_prime, limit, 1.0)
+        except ValueError as e:
+            print e
+            #raise ValueError('log-likelihood function has no maximum given'
+            #                 ' the empirical example provided. Please samp'
+            #                 'le additional points and try again.')
+            contrast = limit
+            sigma_contrast = 1.0
+            return contrast, sigma_contrast
+        
+        # def logL_dbl_prime(contrast):
+        #     M = 1.0 / (contrast + 1e-100)
+        #     t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
+        #     t2 = - N * digamma(M)
+        #     t3 = np.sum( digamma(k + M) )
+        #     return t1 + t2 + t3
+            
+        #sigma_contrast = logL_dbl_prime(contrast)
+        sigma_contrast = 10.0
+        if sigma_contrast < 0.0:
+            raise RuntimeError('Maximum likelihood optimization found a local '
+                               'minimum instead of maximum! sigma = %s' % sigma_contrast)
+                               
+                               
     elif method == 'lsq': # use least-squares fit
+    
+        cut = 0
+        fit_p = False
 
         empirical_pmf = np.bincount(samples)
-        k_range = np.arange(len(empirical_pmf))
-        #print empirical_pmf, k_range, k_bar
+        k_range = np.arange( len(empirical_pmf) )
 
-        err = lambda contrast : negative_binomial_pmf(k_range, k_bar, contrast) - empirical_pmf
-        #def err(contrast):
-        #    print k_range, k_bar, contrast
-        #    return negative_binomial_pmf(k_range, k_bar, contrast) - empirical_pmf
+        def _nb_pmf(M, p):
+            t1 = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range + 1))
+            t2 = np.power(p, k_range)
+            t3 = np.power(1.0 - p, M)
+            return t1 * t2 * t3
 
-        
-        c0 = 0.5
-        contrast, success = optimize.leastsq(err, c0)
-        if success:
-            contrast = contrast[0]
-            sigma_contrast = success
+        def err(args):
+            
+            if fit_p:
+                M, p, s = args
+            else:
+                M, s = args
+                p = 1.0 / (k_bar/M + 1.0)
+                
+            if (p < 0.0) or (p > 1.0) or (M < 1.0):
+                return np.inf
+                
+            obs = s * empirical_pmf[cut:] / np.sum(empirical_pmf[cut:])
+            return np.sum(np.square(_nb_pmf(M, p)[cut:] - obs))
+
+        if fit_p:
+            args0 = (2.0, 0.5, 10.0)
         else:
-            raise RuntimeError('least-squares fit did not converge.')
+            args0 = (2.0, 10.0)
+        
+        res = optimize.minimize(err, args0, method='Powell')
+        
+        print res.x
+        contrast = 1.0/res.x[0]
+        #contrast = 1.0/res.x
+        
+        sigma_contrast = 1.0
     
     elif method == 'expansion': # use low-order expansion
         # directly from the SI of the paper in the doc string

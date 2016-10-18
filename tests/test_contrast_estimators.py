@@ -12,13 +12,14 @@ from matplotlib.ticker import FormatStrFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # ----------------- parameters ---------------
-sample_size = 10000
+sample_size = 1000
+no_zero_samples = False
 
 k_range = 15
 k_bar_min = -2
 
-contrasts = np.linspace(0.01, 0.99, 99)
-k_bars    = np.logspace(k_bar_min,  1, 100)
+contrasts = np.linspace(0.01, 0.99, 99) # 99
+k_bars    = np.logspace(k_bar_min,  1, 100) # 100
 # --------------------------------------------
 
 methods = ["ml", "lsq", "expansion"]
@@ -44,7 +45,17 @@ for im,method in enumerate(methods):
     for i,contrast in enumerate(contrasts):
         for j,k_bar in enumerate(k_bars):
 
-            samples = sc.negative_binomial_samples(k_bar, contrast, size=sample_size)
+            if no_zero_samples:
+                ss = sample_size * 100
+                samples = []
+                while len(samples) < sample_size:
+                    ss *= 2
+                    samples = sc.negative_binomial_samples(k_bar, contrast, size=ss)
+                    samples = samples[ samples > 0 ]
+                    samples[:sample_size]
+            else:
+                samples = sc.negative_binomial_samples(k_bar, contrast, size=sample_size)
+
             c_hat[i,j], sigma[i,j] = sc.fit_negative_binomial(samples, method=method)
             err[i,j] = np.abs(c_hat[i,j] - contrast) / contrast
 
