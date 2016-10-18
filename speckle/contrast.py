@@ -180,6 +180,12 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
         # this is not quite what they recommend, but it's close...
         # what they recommend is a bit confusing to me atm --TJL
         sigma_contrast = np.power(2.0 * (1.0 + contrast) / N, 0.5) / k_bar
+
+    elif method == 'felix':
+        p0 = np.sum( k == 0 ) / N
+        p1 = np.sum( k == 1 ) / N
+        contrast = p0 / p1 - 1.0 / k_bar
+        sigma_contrast = 1.0
         
         
     else:
@@ -303,15 +309,17 @@ def fit_negative_binomial_from_hist(empirical_pmf, method='ml', limit=1e-4):
 
         sigma_contrast = 0.0
 
+
     elif method == 'expansion': # use low-order expansion
         # directly from the SI of the paper in the doc string
-        p1 = float(empirical_pmf[1]) / np.sum(empirical_pmf)
-        p2 = float(empirical_pmf[2]) / np.sum(empirical_pmf)
+        p1 = float(empirical_pmf[1]) / N
+        p2 = float(empirical_pmf[2]) / N
         contrast = (2.0 * p2 * (1.0 - p1) / np.square(p1)) - 1.0
         
         # this is not quite what they recommend, but it's close...
         # what they recommend is a bit confusing to me atm --TJL
-        sigma_contrast = np.power(2.0 * (1.0 + contrast) / N, 0.5) / k_bar
+        #sigma_contrast = np.power(2.0 * (1.0 + contrast) / N, 0.5) / k_bar
+        sigma_contrast = 0.0
         
         
     else:

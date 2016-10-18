@@ -19,15 +19,16 @@ parser.add_argument('-n', '--nshots', type=int, help='number of shots to process
 parser.add_argument('-m', '--max', type=int, help='max shots per core', default=0)
 args = parser.parse_args()
 
-ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
+#ds_string = 'exp=xcsm9816:run=%s:smd:dir=/reg/d/ffb/xcs/xcsm9816/xtc:live' % args.run
+ds_string = 'exp=xcsm9816:run=%s:smd' % args.run
 print 'Processing: %s' % ds_string
 ds = psana.MPIDataSource(ds_string)
-smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/photon_acfs/run%04d.h5' % args.run)
+smldata = ds.small_data('/reg/d/psdm/xcs/xcsm9816/scratch/photon_acfs/run%04d.h5' % args.run, gather_interval=1000)
 
 
 # >>> detectors
 
-adu_per_photon = 160.0 # for ePix100, a bit over the 1 ph peak at 147
+adu_per_photon = 147.0 # for ePix100, a bit over the 1 ph peak at 147
 
 # pulse
 evr  = psana.Detector('evr0')
@@ -48,14 +49,19 @@ mask_2 = np.load('/reg/d/psdm/xcs/xcsm9816/results/sellberg/masks/mask-droplet_a
 mask_3 = np.load('/reg/d/psdm/xcs/xcsm9816/results/sellberg/masks/mask-droplet_avg_run43_epix3_1000_shots+borders.npy')
 mask_4 = np.load('/reg/d/psdm/xcs/xcsm9816/results/sellberg/masks/mask-droplet_avg_run43_epix4_1000_shots+borders.npy')
 
+mask_1 = np.logical_not(mask_1)
+mask_2 = np.logical_not(mask_2)
+mask_3 = np.logical_not(mask_3)
+mask_4 = np.logical_not(mask_4)
+
 # >>> summary data
 #cspad_sum = np.zeros(cspad_shape)
 summed_shots = 0
 
-#epix_1_acf_sum = np.zeros(epix_acf_shape)
-#epix_2_acf_sum = np.zeros(epix_acf_shape)
-#epix_3_acf_sum = np.zeros(epix_acf_shape)
-#epix_4_acf_sum = np.zeros(epix_acf_shape)
+epix_1_acf_sum = np.zeros(epix_acf_shape)
+epix_2_acf_sum = np.zeros(epix_acf_shape)
+epix_3_acf_sum = np.zeros(epix_acf_shape)
+epix_4_acf_sum = np.zeros(epix_acf_shape)
 
 epix_1_acfp_sum = np.zeros(epix_acf_shape)
 epix_2_acfp_sum = np.zeros(epix_acf_shape)
@@ -85,8 +91,8 @@ for ie, evt in enumerate(ds.events()):
         continue
 
     ipm6_power = ipm6.channel(evt)[0]
-    if ipm6_power < 1.0:
-        continue
+    #if ipm6_power < 0.5:
+    #    continue
 
     smldata.event(xrays_on=xrays_on, ipm6=ipm6_power)
 
@@ -100,10 +106,10 @@ for ie, evt in enumerate(ds.events()):
             print "Reached %d summed shots, breaking loop.." % summed_shots
             break
         
-        #epix_1_acf_sum += autocorrelate_image(epix_1.calib(evt) * mask_1)
-        #epix_2_acf_sum += autocorrelate_image(epix_2.calib(evt) * mask_2)
-        #epix_3_acf_sum += autocorrelate_image(epix_3.calib(evt) * mask_3)
-        #epix_4_acf_sum += autocorrelate_image(epix_4.calib(evt) * mask_4)
+        epix_1_acf_sum += autocorrelate_image(epix_1.calib(evt) * mask_1)
+        epix_2_acf_sum += autocorrelate_image(epix_2.calib(evt) * mask_2)
+        epix_3_acf_sum += autocorrelate_image(epix_3.calib(evt) * mask_3)
+        epix_4_acf_sum += autocorrelate_image(epix_4.calib(evt) * mask_4)
 
         epix_1_acfp_sum += autocorrelate_image(epix_1.photons(evt, adu_per_photon=adu_per_photon) * mask_1)
         epix_2_acfp_sum += autocorrelate_image(epix_2.photons(evt, adu_per_photon=adu_per_photon) * mask_2)
@@ -115,10 +121,10 @@ for ie, evt in enumerate(ds.events()):
                 break
 
 smldata.sum(summed_shots)
-#smldata.sum(epix_1_acf_sum)
-#smldata.sum(epix_1_acf_sum)
-#smldata.sum(epix_1_acf_sum)
-#smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acf_sum)
+smldata.sum(epix_1_acf_sum)
 smldata.sum(epix_1_acfp_sum)
 smldata.sum(epix_1_acfp_sum)
 smldata.sum(epix_1_acfp_sum)
@@ -126,10 +132,10 @@ smldata.sum(epix_1_acfp_sum)
 
 
 smldata.save(summed_shots=summed_shots,
-#             epix_1_acf_sum=epix_1_acf_sum,
-#             epix_2_acf_sum=epix_2_acf_sum,
-#             epix_3_acf_sum=epix_3_acf_sum,
-#             epix_4_acf_sum=epix_4_acf_sum,
+             epix_1_acf_sum=epix_1_acf_sum,
+             epix_2_acf_sum=epix_2_acf_sum,
+             epix_3_acf_sum=epix_3_acf_sum,
+             epix_4_acf_sum=epix_4_acf_sum,
              epix_1_acfp_sum=epix_1_acfp_sum,
              epix_2_acfp_sum=epix_2_acfp_sum,
              epix_3_acfp_sum=epix_3_acfp_sum,
