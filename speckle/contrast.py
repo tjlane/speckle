@@ -49,153 +49,154 @@ def fit_negative_binomial(samples, method='ml', limit=1e-4):
     References
     ----------
     ..[1] PRL 109, 185502 (2012)
-    """
+    """    
+    h = np.bincount(samples)
+    return fit_negative_binomial_from_hist(h, method=method, limit=limit)
     
     # copied from 347fe0e --TJL
 
-    k = samples.flatten()
-    N = float( len(k) )
-    k_bar = np.mean(samples)
+    # k = samples.flatten()
+    # N = float( len(k) )
+    # k_bar = np.mean(samples)
+    #
+    # if method == 'ml': # use maximium likelihood estimation
+    #
+    #     def logL_prime(contrast):
+    #         M = 1.0 / contrast
+    #         t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
+    #         t2 = np.sum( (k_bar - k)/(k_bar + M) + digamma(k + M) )
+    #         return t1 + t2
+    #
+    #     try:
+    #         contrast = optimize.brentq(logL_prime, limit, 1.0)
+    #     except ValueError as e:
+    #         print e
+    #         #raise ValueError('log-likelihood function has no maximum given'
+    #         #                 ' the empirical example provided. Please samp'
+    #         #                 'le additional points and try again.')
+    #         contrast = limit
+    #         sigma_contrast = 1.0
+    #         return contrast, sigma_contrast
+    #
+    #     def logL_dbl_prime(contrast):
+    #         M = 1.0 / (contrast + 1e-100)
+    #         t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
+    #         t2 = - N * digamma(M)
+    #         t3 = np.sum( digamma(k + M) )
+    #         return t1 + t2 + t3
+    #
+    #     sigma_contrast = logL_dbl_prime(contrast)
+    #     if sigma_contrast < 0.0:
+    #         raise RuntimeError('Maximum likelihood optimization found a local '
+    #                            'minimum instead of maximum! sigma = %s' % sigma_contrast)
+    #
+    #
+    # elif method == 'ml-nozero': # use maximium likelihood estimation
+    #
+    #     def logL_prime(contrast):
+    #
+    #         M = 1.0 / contrast
+    #         p = 1.0 / (k_bar / M + 1.0)
+    #
+    #         # this is the non-zeros correction to the norm const (d log N / dr)
+    #         pr = np.power(1.0 - p, M)
+    #         t0 = pr * np.log(1.0 - p) / (pr + 1.0)
+    #
+    #         t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
+    #         t2 = np.sum( (k_bar - k)/(k_bar + M) + digamma(k + M) )
+    #
+    #         return t0 + t1 + t2
+    #
+    #     try:
+    #         contrast = optimize.brentq(logL_prime, limit, 1.0)
+    #     except ValueError as e:
+    #         print e
+    #         #raise ValueError('log-likelihood function has no maximum given'
+    #         #                 ' the empirical example provided. Please samp'
+    #         #                 'le additional points and try again.')
+    #         contrast = limit
+    #         sigma_contrast = 1.0
+    #         return contrast, sigma_contrast
+    #
+    #     # def logL_dbl_prime(contrast):
+    #     #     M = 1.0 / (contrast + 1e-100)
+    #     #     t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
+    #     #     t2 = - N * digamma(M)
+    #     #     t3 = np.sum( digamma(k + M) )
+    #     #     return t1 + t2 + t3
+    #
+    #     #sigma_contrast = logL_dbl_prime(contrast)
+    #     sigma_contrast = 10.0
+    #     if sigma_contrast < 0.0:
+    #         raise RuntimeError('Maximum likelihood optimization found a local '
+    #                            'minimum instead of maximum! sigma = %s' % sigma_contrast)
+    #
+    #
+    # elif method == 'lsq': # use least-squares fit
+    #
+    #     cut = 0
+    #     fit_p = False
+    #
+    #     empirical_pmf = np.bincount(samples)
+    #     k_range = np.arange( len(empirical_pmf) )
+    #
+    #     def _nb_pmf(M, p):
+    #         t1 = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range + 1))
+    #         t2 = np.power(p, k_range)
+    #         t3 = np.power(1.0 - p, M)
+    #         return t1 * t2 * t3
+    #
+    #     def err(args):
+    #
+    #         if fit_p:
+    #             M, p, s = args
+    #         else:
+    #             M, s = args
+    #             p = 1.0 / (k_bar/M + 1.0)
+    #
+    #         if (p < 0.0) or (p > 1.0) or (M < 1.0):
+    #             return np.inf
+    #
+    #         obs = s * empirical_pmf[cut:] / np.sum(empirical_pmf[cut:])
+    #         return np.sum(np.square(_nb_pmf(M, p)[cut:] - obs))
+    #
+    #     if fit_p:
+    #         args0 = (2.0, 0.5, 10.0)
+    #     else:
+    #         args0 = (2.0, 10.0)
+    #
+    #     res = optimize.minimize(err, args0, method='Powell')
+    #
+    #     print res.x
+    #     contrast = 1.0/res.x[0]
+    #     #contrast = 1.0/res.x
+    #
+    #     sigma_contrast = 1.0
+    #
+    # elif method == 'expansion': # use low-order expansion
+    #     # directly from the SI of the paper in the doc string
+    #     p1 = np.sum( k == 1 ) / N
+    #     p2 = np.sum( k == 2 ) / N
+    #     contrast = (2.0 * p2 * (1.0 - p1) / np.square(p1)) - 1.0
+    #
+    #     # this is not quite what they recommend, but it's close...
+    #     # what they recommend is a bit confusing to me atm --TJL
+    #     sigma_contrast = np.power(2.0 * (1.0 + contrast) / N, 0.5) / k_bar
+    #
+    # elif method == 'felix':
+    #     p0 = np.sum( k == 0 ) / N
+    #     p1 = np.sum( k == 1 ) / N
+    #     contrast = p0 / p1 - 1.0 / k_bar
+    #     sigma_contrast = 1.0
+    #
+    #
+    # else:
+    #     raise ValueError('`method` must be one of {"ml", "ls", "expansion"}')
+    #
+    # return contrast, sigma_contrast
     
-    if method == 'ml': # use maximium likelihood estimation
-        
-        def logL_prime(contrast):
-            M = 1.0 / contrast
-            t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
-            t2 = np.sum( (k_bar - k)/(k_bar + M) + digamma(k + M) )
-            return t1 + t2
-       
-        try: 
-            contrast = optimize.brentq(logL_prime, limit, 1.0)
-        except ValueError as e:
-            print e
-            #raise ValueError('log-likelihood function has no maximum given'
-            #                 ' the empirical example provided. Please samp'
-            #                 'le additional points and try again.')
-            contrast = limit
-            sigma_contrast = 1.0
-            return contrast, sigma_contrast
-        
-        def logL_dbl_prime(contrast):
-            M = 1.0 / (contrast + 1e-100)
-            t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
-            t2 = - N * digamma(M)
-            t3 = np.sum( digamma(k + M) )
-            return t1 + t2 + t3
-            
-        sigma_contrast = logL_dbl_prime(contrast)
-        if sigma_contrast < 0.0:
-            raise RuntimeError('Maximum likelihood optimization found a local '
-                               'minimum instead of maximum! sigma = %s' % sigma_contrast) 
-    
-    
-    elif method == 'ml-nozero': # use maximium likelihood estimation
-        
-        def logL_prime(contrast):
-            
-            M = 1.0 / contrast
-            p = 1.0 / (k_bar / M + 1.0)
-            
-            # this is the non-zeros correction to the norm const (d log N / dr)
-            pr = np.power(1.0 - p, M)
-            t0 = pr * np.log(1.0 - p) / (pr + 1.0) 
-            
-            t1 = -N * (np.log(k_bar/M + 1.0) + digamma(M))
-            t2 = np.sum( (k_bar - k)/(k_bar + M) + digamma(k + M) )
-            
-            return t0 + t1 + t2
-       
-        try: 
-            contrast = optimize.brentq(logL_prime, limit, 1.0)
-        except ValueError as e:
-            print e
-            #raise ValueError('log-likelihood function has no maximum given'
-            #                 ' the empirical example provided. Please samp'
-            #                 'le additional points and try again.')
-            contrast = limit
-            sigma_contrast = 1.0
-            return contrast, sigma_contrast
-        
-        # def logL_dbl_prime(contrast):
-        #     M = 1.0 / (contrast + 1e-100)
-        #     t1 = np.sum( (np.square(k_bar) - k*M) / (M * np.square(k_bar + M)) )
-        #     t2 = - N * digamma(M)
-        #     t3 = np.sum( digamma(k + M) )
-        #     return t1 + t2 + t3
-            
-        #sigma_contrast = logL_dbl_prime(contrast)
-        sigma_contrast = 10.0
-        if sigma_contrast < 0.0:
-            raise RuntimeError('Maximum likelihood optimization found a local '
-                               'minimum instead of maximum! sigma = %s' % sigma_contrast)
-                               
-                               
-    elif method == 'lsq': # use least-squares fit
-    
-        cut = 0
-        fit_p = False
 
-        empirical_pmf = np.bincount(samples)
-        k_range = np.arange( len(empirical_pmf) )
 
-        def _nb_pmf(M, p):
-            t1 = np.exp(gammaln(k_range + M) - gammaln(M) - gammaln(k_range + 1))
-            t2 = np.power(p, k_range)
-            t3 = np.power(1.0 - p, M)
-            return t1 * t2 * t3
-
-        def err(args):
-            
-            if fit_p:
-                M, p, s = args
-            else:
-                M, s = args
-                p = 1.0 / (k_bar/M + 1.0)
-                
-            if (p < 0.0) or (p > 1.0) or (M < 1.0):
-                return np.inf
-                
-            obs = s * empirical_pmf[cut:] / np.sum(empirical_pmf[cut:])
-            return np.sum(np.square(_nb_pmf(M, p)[cut:] - obs))
-
-        if fit_p:
-            args0 = (2.0, 0.5, 10.0)
-        else:
-            args0 = (2.0, 10.0)
-        
-        res = optimize.minimize(err, args0, method='Powell')
-        
-        print res.x
-        contrast = 1.0/res.x[0]
-        #contrast = 1.0/res.x
-        
-        sigma_contrast = 1.0
-    
-    elif method == 'expansion': # use low-order expansion
-        # directly from the SI of the paper in the doc string
-        p1 = np.sum( k == 1 ) / N
-        p2 = np.sum( k == 2 ) / N
-        contrast = (2.0 * p2 * (1.0 - p1) / np.square(p1)) - 1.0
-        
-        # this is not quite what they recommend, but it's close...
-        # what they recommend is a bit confusing to me atm --TJL
-        sigma_contrast = np.power(2.0 * (1.0 + contrast) / N, 0.5) / k_bar
-
-    elif method == 'felix':
-        p0 = np.sum( k == 0 ) / N
-        p1 = np.sum( k == 1 ) / N
-        contrast = p0 / p1 - 1.0 / k_bar
-        sigma_contrast = 1.0
-        
-        
-    else:
-        raise ValueError('`method` must be one of {"ml", "ls", "expansion"}')
-    
-    return contrast, sigma_contrast    
-    
-
-    #h = np.bincount(samples)
-    #return fit_negative_binomial_from_hist(h, method=method, limit=limit)
 
 
 def fit_negative_binomial_from_hist(empirical_pmf, method='ml', limit=1e-4):
