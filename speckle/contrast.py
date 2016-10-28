@@ -372,3 +372,61 @@ def negative_binomial_samples(k_bar, contrast, size=1):
     return samples
 
 
+def kbar_plot(samples, filename=None, show=True, k_range=5, k_bars=np.logspace(-3, 0, 100)):
+    """
+    Generate a "k_bar" plot, which shows the statistics of a series of samples
+    along side the expected bounds of a negative binomial distribution.
+    
+    Parameters
+    ----------
+    samples : ndarray
+        A shape (N, ...) array of N samples. Can have any other number of dimensions,
+        typically 1 or 2 (2d image).
+        
+    filename : str or None
+        Pass a string to write the figure to disk.
+        
+    show : bool
+        Show the plot!
+    """
+    
+    colors = ['black', 'blue', 'red', 'green', 'teal', 'orange']
+    n_colors = len(colors)
+
+    min_pmf = np.zeros((len(k_bars), k_range))
+    max_pmf = np.zeros((len(k_bars), k_range))
+
+    for i,k_bar in enumerate(k_bars):
+        min_pmf[i,:] = negative_binomial_pmf(k_range, k_bar, 1e-9)
+        max_pmf[i,:] = negative_binomial_pmf(k_range, k_bar, 1.0)
+
+    plt.figure()
+
+    for sample in samples:
+        k_bar = np.mean(sample)
+        p = np.bincount(sample.flatten()) / float(np.product(sample.shape))
+        for i in range(k_range):
+            plt.plot(k_bar, p[i], '.', color=colors[i%n_colors])
+
+    for i in range(k_range):
+        plt.plot(k_bars, min_pmf[:,i], color=colors[i%n_colors])
+        plt.plot(k_bars, max_pmf[:,i], color=colors[i%n_colors])
+        if i > 0:
+            plt.text(k_bars[13*i], max_pmf[13*i,i], 'k=%d'%i, color=colors[i%n_colors],
+                     bbox=dict(facecolor='white', alpha=0.7, 
+                               edgecolor=colors[i%n_colors], boxstyle='round,pad=.3'))
+
+
+    plt.xscale('log')
+    plt.yscale('log')
+
+    plt.xlim([1e-3, 1])
+    plt.ylim([1e-6, 1e-1])
+
+    if filename:
+        plt.savefig(filename)
+
+    if show:
+        plt.show()
+
+    return
