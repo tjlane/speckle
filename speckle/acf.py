@@ -13,7 +13,7 @@ except ImportError as e:
     print ('Could not import psana, proceeding')
 
 
-def autocorrelate_image(image, normalize=True):
+def autocorrelate_image(image, normalize='xpcs'):
     """
     Autocorrelate an image to determine the distribution of speckle sizes.
     
@@ -46,13 +46,37 @@ def autocorrelate_image(image, normalize=True):
     for i in range(n_images):
 
         img = image[i]
-        x = img - img.mean()
-        acf_i = fftconvolve(x, x[::-1,::-1])
+        # x = img - img.mean()
+        # acf_i = fftconvolve(x, x[::-1,::-1])
 
-        if normalize:
+
+        if normalize == None:
+            x = img - img.mean()
+            acf_i = fftconvolve(x, x[::-1,::-1])
+
+
+        elif normalize == 'xpcs':
+            acf_i = fftconvolve(img, img[::-1,::-1])
+            
+            s = np.sum(img)
+            n_pix = np.product(img.shape)
+            norm = float(s*s)/float(n_pix)
+
+            acf[img_shp[0]-1,img_shp[1]-1] -= float(s)
+            acf /= norm
+
+
+        elif normalize == 'statistical':
+            x = img - img.mean()
+            acf_i = fftconvolve(x, x[::-1,::-1])
+            
             sigma_sq = np.sum(np.square(x))
             acf_i[img_shp[0]-1,img_shp[1]-1] -= sigma_sq
             acf_i /= (float(sigma_sq * n_pix) + 1e-16)
+            
+        else:
+            raise ValueError('`normalize` must be one of:'
+                             ' {"xpcs", "statistical", None}')
 
         acf += acf_i
 

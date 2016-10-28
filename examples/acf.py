@@ -25,7 +25,7 @@ for ie, evt in enumerate(ds.events()):
 
     if ie > SHOTS: break
 
-a = acf.autocorrelate_image(np.array(img))
+a = acf.autocorrelate_image(np.array(img), normalize='xpcs')
 p = acf.speckle_profile(a)
 
 plt.figure()
