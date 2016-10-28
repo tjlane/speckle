@@ -2,11 +2,11 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from speckle import acf
 
-sys.path.append('../speckle')
-import core
 
-test_image = np.random.randn(32, 185, 388)
+#test_image = np.random.randn(32, 185, 388)
+test_image = np.zeros((32, 185, 388))
 
 ng = 1000
 sigma = 150.0
@@ -23,17 +23,18 @@ for i in range(ng):
     
     test_image[p,:,:] += gaussian_image
 
-acf = core.autocorrelate_image(test_image)
-acf[184,387] = 0.0
+cf = acf.autocorrelate_image(test_image, normalize=True)
+#cf[184,387] = 0.0
 
 
-plt.figure()
-plt.imshow(acf, interpolation='nearest')
-plt.show()
+profile = acf.speckle_profile(cf)
 
-
-profile = core.speckle_profile(acf)
-plt.figure()
+plt.figure(figsize=(15,4))
+plt.subplot(131)
+plt.imshow(test_image[0], interpolation='nearest')
+plt.subplot(132)
+plt.imshow(cf, interpolation='nearest')
+plt.subplot(133)
 plt.plot(profile[:,0], profile[:,1])
 plt.show()
 
