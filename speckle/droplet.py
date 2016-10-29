@@ -6,6 +6,7 @@ Droplet Algorithms
 import numpy as np
 import scipy.ndimage.measurements as smt 
 import scipy.ndimage.morphology as smf
+from scipy.ndimage import filters
 
 try:
     from skbeam.core.accumulators.droplet import dropletfind, dropletanal
@@ -13,6 +14,36 @@ try:
 except ImportError as e:
     _SKBEAM = False
     
+    
+    
+def photonize(img, adu_per_photon, remainder_required=0.9, remainder_min=0.5):
+    """
+    
+    """
+    
+    img[img < 0.0] = 0.0
+    full_photons = (img // adu_per_photon).astype(np.int)
+    remainder    = img % adu_per_photon
+    
+    neighbour_max = filters.maximum_filter(remainder, 
+                                           footprint=np.array([[0,1,0],
+                                                               [1,0,1],
+                                                               [0,1,0]]))
+    neighbour_max[neighbour_max < remainder_min] = 0.0 # filter small values
+    
+    neighbour_max_wc = filters.maximum_filter(remainder, 
+                                              footprint=np.array([[0,1,0],
+                                                                  [1,1,1],
+                                                                  [0,1,0]]))
+    local_maxima = (remainder == neighbour_max_wc)
+    split_photons = ((remainder + neighbour_max) > remainder_required) *\
+                    local_maxima
+    
+    
+    photon_img = full_photons + split_photons
+    
+    return photon_img
+
 
 def dropletize(img, threshold=10.0, dilate=1, return_all=False):
     """

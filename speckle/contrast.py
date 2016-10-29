@@ -389,6 +389,8 @@ def kbar_plot(samples, filename=None, show=True, k_range=5, k_bars=np.logspace(-
     show : bool
         Show the plot!
     """
+
+    from matplotlib import pyplot as plt
     
     colors = ['black', 'blue', 'red', 'green', 'teal', 'orange']
     n_colors = len(colors)
@@ -404,7 +406,7 @@ def kbar_plot(samples, filename=None, show=True, k_range=5, k_bars=np.logspace(-
 
     for sample in samples:
         k_bar = np.mean(sample)
-        p = np.bincount(sample.flatten()) / float(np.product(sample.shape))
+        p = np.bincount(sample.flatten(), minlength=5) / float(np.product(sample.shape))
         for i in range(k_range):
             plt.plot(k_bar, p[i], '.', color=colors[i%n_colors])
 
