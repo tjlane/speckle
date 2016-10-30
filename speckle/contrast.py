@@ -391,6 +391,9 @@ def kbar_plot(samples, filename=None, show=True, k_range=5, k_bars=np.logspace(-
     """
 
     from matplotlib import pyplot as plt
+    if samples.dtype is not np.int:
+        print 'Warning, attempting to cast input to int'
+        samples = samples.astype(np.int)
     
     colors = ['black', 'blue', 'red', 'green', 'teal', 'orange']
     n_colors = len(colors)
@@ -424,6 +427,9 @@ def kbar_plot(samples, filename=None, show=True, k_range=5, k_bars=np.logspace(-
 
     plt.xlim([1e-3, 1])
     plt.ylim([1e-6, 1e-1])
+
+    plt.xlabel(r'$\bar{k}$')
+    plt.ylabel(r'$p(k)$')
 
     if filename:
         plt.savefig(filename)
